@@ -80,3 +80,12 @@
     update_cache: yes
     state: present
 
+- name: Install Nvidia Drivers (CachyOS 580xx Series)
+  pacman:
+    name:
+      - egl-gbm
+      - egl-wayland
+      - nvidia-580xx-dkms
+      - nvidia-580xx-utils
+      - nvidia-580xx-settings
+    state: present
