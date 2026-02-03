@@ -1,6 +1,6 @@
 ---
 
-- name: Install Kernal Safeguards (LTS)
+- name: Install Kernel Safeguards (LTS)
   pacman:
     name:
       - linux-lts
