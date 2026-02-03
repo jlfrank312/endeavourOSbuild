@@ -1,0 +1,16 @@
+# --- Ansible Safety ---
+*.retry
+*.log
+inventory.ini
+ansible.cfg
+
+# --- Secrets (Critical) ---
+secrets.yml
+passwords.txt
+.env
+
+# --- System Junk ---
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store

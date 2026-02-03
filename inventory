@@ -1,0 +1,5 @@
+[workstation]
+
+# "local" means: Don't use SSH. Execute commands directly on this OS.
+
+localhost ansible_connection=local

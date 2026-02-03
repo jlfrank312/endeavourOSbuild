@@ -1,0 +1,27 @@
+---
+
+- name: Configure My Workstation
+
+  hosts: localhost
+
+  connection: local
+
+  
+
+  # Load global variables (like username) from this file
+
+  vars_files:
+
+    - group_vars/all.yml
+
+
+
+  # Run these roles in order
+
+  roles:
+
+    - base        # Always run first! (Sets up users, sudo, etc)
+
+    # - desktop   # (Commented out for now until we build it)
+
+    # - apps      # (Commented out for now until we build it)

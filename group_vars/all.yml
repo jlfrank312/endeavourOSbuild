@@ -1,0 +1,13 @@
+# Your User Details
+
+user_name: jordan  # CHANGE THIS to your actual linux username
+
+git_name: "endeavourOSbuild"
+
+git_email: "jlfrank312@gmail.com"
+
+
+
+# System Settings
+
+timezone: "America/Los_Angeles" # Or your timezone

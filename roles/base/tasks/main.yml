@@ -1,0 +1,82 @@
+---
+
+- name: Install Kernal Safeguards (LTS)
+  pacman:
+    name:
+      - linux-lts
+      - linux-lts-headers
+    state: present
+
+- name: Install BTRFS Safeguards (Snapper)
+  pacman:
+    name: 
+      - snapper
+      - snap-pac         # Auto-snapshot on pacman update
+      - btrfs-assistant  # GUI for managing snapshots
+    state: present
+
+- name: Enable Snapper cleanup timer (Prevent disk filling)
+  systemd:
+    name: snapper-cleanup.timer
+    enabled: yes
+    state: started
+
+
+
+# --- CachyOS Optimizations ---
+
+- name: Allow x86_64-v3 architecture in Pacman
+  lineinfile: 
+    path: /etc/pacman.conf
+    regexp: '^Architecture = auto'
+    line: 'Architecture = auto x86_64_v3'
+
+- name: Import CachyOS GPG Key
+  command: pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
+
+- name: Locally Sign CachyOS GPG Key
+  command: pacman-key --lsign-key F3B607488DB35A47
+
+- name: Create temporary CachyOS mirrorlist
+  copy: 
+    dest: /etc/pacman.d/cachyos-mirrorlist
+    content: |
+      #Temporary bootstrap mirror
+      Server = https://mirror.cachyos.org/repo/$arch/$repo
+    mode: '0644'
+
+- name: Create temporary CachyOS V3 mirrorlist
+  copy:
+    dest: /etc/pacman.d/cachyos-v3-mirrorlist
+    content: |
+      #Temporary bootstrap mirror - Yes, this one is gross. I haven't found a better way yet.
+      Server = https://mirror.cachyos.org/repo/x86_64_v3/$repo
+    mode: '0644'
+
+- name: Enable CachyOS Repositories in pacman.conf
+  blockinfile:
+    path: /etc/pacman.conf
+    insertbefore: "^#?\\[core\\]"
+    block: |
+      [cachyos]
+      Include = /etc/pacman.d/cachyos-mirrorlist
+
+      [cachyos-v3]
+      Include = /etc/pacman.d/cachyos-v3-mirrorlist
+
+      [cachyos-core-v3]
+      Include = /etc/pacman.d/cachyos-v3-mirrorlist
+
+      [cachyos-extra-v3]
+      Include = /etc/pacman.d/cachyos-v3-mirrorlist
+
+- name: Install CachyOS Kernel
+  pacman: 
+    name: 
+      - linux-cachyos
+      - linux-cachyos-headers
+      - cachyos-mirrorlist
+      - cachyos-keyring
+    update_cache: yes
+    state: present
+
