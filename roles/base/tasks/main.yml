@@ -1,41 +1,19 @@
----
+# --- Initial Pacman Upgrade, EndeavourOS Repos --- 
 
-- name: Install Kernel Safeguards (LTS)
-  pacman:
-    name:
-      - linux-lts
-      - linux-lts-headers
-    state: present
+- name: Upgrade Pacman Cache to Current
+  ansible.builtin.pacman:
+    update_cache: yes
+    upgrade: yes
 
-- name: Install BTRFS Safeguards (Snapper)
-  pacman:
-    name: 
-      - snapper
-      - snap-pac         # Auto-snapshot on pacman update
-      - btrfs-assistant  # GUI for managing snapshots
-    state: present
-
-- name: Enable Snapper cleanup timer (Prevent disk filling)
-  systemd:
-    name: snapper-cleanup.timer
-    enabled: yes
-    state: started
-
-
-
-# --- CachyOS Optimizations ---
-
-- name: Allow x86_64-v3 architecture in Pacman
-  lineinfile: 
-    path: /etc/pacman.conf
-    regexp: '^Architecture = auto'
-    line: 'Architecture = auto x86_64_v3'
+# --- Add CachyOS Repo Keys ---
 
 - name: Import CachyOS GPG Key
   command: pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
 
 - name: Locally Sign CachyOS GPG Key
   command: pacman-key --lsign-key F3B607488DB35A47
+
+# --- Preparation to Convert to CachyOS Repo Mirrors ---
 
 - name: Create temporary CachyOS mirrorlist
   copy: 
@@ -69,23 +47,72 @@
 
       [cachyos-extra-v3]
       Include = /etc/pacman.d/cachyos-v3-mirrorlist
+  register: cachyos_repos
 
-- name: Convert System to CachyOS
-  command: pacman -Syu --noconfirm
-  register: cachyos_conversion
-  changed_when: "'there is nothing to do' not in cachyos_conversion.stdout"
+
+- name: Install CachyOS Keyring and Mirrorlists
+  pacman: 
+    name: 
+      - cachyos-keyring
+      - cachyos-mirrorlist
+      - cachyos-v3-mirrorlist
+    update_cache: yes
+    state: present
+  register: cachyos_lists
+
+# --- CachyOS Conversion --- 
+
+- name: Convert Pacman Cache to CachyOS
+  ansible.builtin.pacman:
+    update_cache: yes
+    upgrade: yes
+
+##  command: pacman -Syu --noconfirm
+##  register: cachyos_conversion
+##  changed_when: "'there is nothing to do' not in cachyos_conversion.stdout"
+
+# --- CachyOS Optimizations ---
+
+- name: Allow x86_64-v3 architecture in Pacman
+  lineinfile: 
+    path: /etc/pacman.conf
+    regexp: '^Architecture = auto'
+    line: 'Architecture = auto x86_64_v3'
 
 - name: Install CachyOS Kernel
   pacman: 
-    name: 
+    name:  
       - linux-cachyos
       - linux-cachyos-headers
-      - cachyos-mirrorlist
-      - cachyos-keyring
     update_cache: yes
     state: present
 
-- name: Install Nvidia Drivers (CachyOS 580xx Series)
+# --- Safety Tools ---
+
+- name: Install Kernel Safeguards (LTS)
+  pacman:
+    name:
+      - linux-lts
+      - linux-lts-headers
+    state: present
+
+- name: Install BTRFS Safeguards (Snapper)
+  pacman:
+    name: 
+      - snapper
+      - snap-pac         # Auto-snapshot on pacman update
+      - btrfs-assistant  # GUI for managing snapshots
+    state: present
+
+- name: Enable Snapper cleanup timer (Prevent disk filling)
+  systemd:
+    name: snapper-cleanup.timer
+    enabled: yes
+    state: started
+
+# --- Nvidia Prereqs ---
+
+- name: Install Nvidia Drivers (CachyOS 580xx Series) 
   pacman:
     name:
       - egl-gbm
