@@ -121,3 +121,10 @@
       - nvidia-580xx-utils
       - nvidia-580xx-settings
     state: present
+
+# --- Final Convergence of Pacman Cache ---
+
+- name: Upgrade Pacman Cache to Current
+  ansible.builtin.pacman:
+    update_cache: yes
+    upgrade: yes
