@@ -62,6 +62,12 @@
 
 # --- CachyOS Conversion --- 
 
+- name: Allow x86_64-v3 architecture in Pacman
+  lineinfile: 
+    path: /etc/pacman.conf
+    regexp: '^Architecture = auto'
+    line: 'Architecture = auto x86_64_v3'
+
 - name: Convert Pacman Cache to CachyOS
   ansible.builtin.pacman:
     update_cache: yes
@@ -72,12 +78,6 @@
 ##  changed_when: "'there is nothing to do' not in cachyos_conversion.stdout"
 
 # --- CachyOS Optimizations ---
-
-- name: Allow x86_64-v3 architecture in Pacman
-  lineinfile: 
-    path: /etc/pacman.conf
-    regexp: '^Architecture = auto'
-    line: 'Architecture = auto x86_64_v3'
 
 - name: Install CachyOS Kernel
   pacman: 
