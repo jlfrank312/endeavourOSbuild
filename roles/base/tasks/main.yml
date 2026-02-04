@@ -69,13 +69,10 @@
     line: 'Architecture = auto x86_64_v3'
 
 - name: Convert Pacman Cache to CachyOS
-  ansible.builtin.pacman:
-    update_cache: yes
-    upgrade: yes
-
-##  command: pacman -Syu --noconfirm
-##  register: cachyos_conversion
-##  changed_when: "'there is nothing to do' not in cachyos_conversion.stdout"
+  # Forces Pacman to allow downgrading of packages if called for by newly-added CachyOS mirrors
+  command: pacman -Syyuu --noconfirm
+  register: cachyos_conversion
+  changed_when: "'there is nothing to do' not in cachyos_conversion.stdout"
 
 # --- CachyOS Optimizations ---
 
@@ -121,6 +118,8 @@
       - nvidia-580xx-utils
       - nvidia-580xx-settings
     state: present
+  # Only run if NOT a guest VM (i.e., run on bare metal host)
+  when: ansible_virtualization_role != "guest"
 
 # --- Final Convergence of Pacman Cache ---
 
