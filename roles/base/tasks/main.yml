@@ -131,7 +131,7 @@
 # --- Activate Recovery Utilities ---
 
 - name: Initialize Snapper Root Config
-  command: snapper -C root create-config /
+  command: snapper -c root create-config /
   args: 
     creates: /etc/snapper/configs/root
     
