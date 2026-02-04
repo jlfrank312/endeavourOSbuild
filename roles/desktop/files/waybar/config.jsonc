@@ -11,5 +11,19 @@
         "all-outputs": true,
         "format": "{name}"
     },
-    "clock" {
-        "format": "{:%H:%M} 
+    "clock": {
+        "format": "{:%H:%M}  ",
+        "format-alt": "{:%A, %B %d, %Y (%R)}  "
+    },
+    "cpu": {
+        "format": "{usage}% ",
+        "tooltip": false
+    },
+    "memory": {
+        "format": "{}% "
+    },
+    "tray": {
+        "icon-size": 21,
+        "spacing": 10
+    }
+}

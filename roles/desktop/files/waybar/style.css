@@ -1,0 +1,32 @@
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "JetBrainsMono Nerd Font";
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: #1e1e2e; /* Catppuccin Mocha Base */
+    color: #cdd6f4;
+}
+
+#workspaces button {
+    padding: 0 5px;
+    background: transparent;
+    color: #cdd6f4;
+}
+
+#workspaces button.active {
+    color: #89b4fa; /* Blue */
+    border-bottom: 2px solid #89b4fa;
+}
+
+#clock, #cpu, #memory, #tray {
+    padding: 0 10px;
+    color: #cdd6f4;
+}
+
+#clock {
+    background-color: #313244; /* Surface0 */
+}
