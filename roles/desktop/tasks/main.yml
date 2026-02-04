@@ -15,7 +15,8 @@
   pacman:
     name:
     - hyprland
-    - kitty
+#   - kitty                  # Disabled while testing in VM
+    - foot
     - wofi
     - waybar
     - dolphin
@@ -72,24 +73,21 @@
   copy:
     dest: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     content: |
-      # --- Source the dynamic environment file ---
       source = ~/.config/hypr/env.conf
-
-      # --- Monitor Config ---
       monitor=,preferred,auto,1
-
-      # --- Keybinds ---
+      
       $mainMod = SUPER
-      bind = $mainMod, Q, exec, kitty
+      $terminal = foot
+      
+      bind = $mainMod, Q, exec, $terminal
       bind = $mainMod, E, exec, dolphin
       bind = $mainMod, SPACE, exec, wofi --show drun
       bind = $mainMod, M, exit, 
-
-      # --- Autostart Critical Services ---
+      
       exec-once = waybar
       exec-once = dunst
       exec-once = systemctl --user start hyprpolkitagent
     owner: "{{ user_name }}"
     group: "{{ user_name }}"
     mode: '0644'
-    force: no # Only create if it doesn't exist
+    force: yes # Force overwrite to update keybinds

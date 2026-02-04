@@ -127,3 +127,20 @@
   ansible.builtin.pacman:
     update_cache: yes
     upgrade: yes
+
+# --- Activate Recovery Utilities ---
+
+- name: Initialize Snapper Root Config
+  command: snapper -C root create-config /
+  args: 
+    creates: /etc/snapper/configs/root
+    
+- name: Configure Snapper Permissions
+  lineinfile:
+    path: /etc/snapper/configs/root
+    regexp: '{{ item.regexp }}'
+    line: '{{ item.line }}'
+  loop:
+    - { regexp: '^ALLOW_GROUPS=.*', line: 'ALLOW_GROUPS="wheel"' }
+    - { regexp: '^TIMELINE_LIMIT_HOURLY=.*', line: 'TIMELINE_LIMIT_HOURLY="5"' }
+    - { regexp: '^TIMELINE_LIMIT_DAILY=.*', line: 'TIMELINE_LIMIT_DAILY="7"' }
