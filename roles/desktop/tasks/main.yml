@@ -30,13 +30,17 @@
 
 # --- Configuration Directory Setup ---
 
-- name: Ensure Hyprland Config Directory Exists
+- name: Ensure Config Directories Exist
   file:
-    path: "/home/{{ user_name }}/.config/hypr"
+    path: "/home/{{ user_name }}/.config/{{ item }}"
     state: directory
     owner: "{{ user_name }}"
     group: "{{ user_name }}"
     mode: '0755'
+  loop:
+    - hypr
+    - waybar
+    - dunst
 
 # --- Smart Environment Variables (VM vs Nvidia) ---
 
@@ -67,27 +71,31 @@
     mode: '0644'
   when: ansible_facts['virtualization_role'] != "guest"
 
-# --- Minimal Starter Config ---
+# --- Static Configuration Deployment ---
 
-- name: Create Minimal Hyprland Config
+- name: Deploy Hyprland Config
   copy:
+    src: hypr/hyprland.conf
     dest: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
-    content: |
-      source = ~/.config/hypr/env.conf
-      monitor=,preferred,auto,1
-      
-      $mainMod = SUPER
-      $terminal = foot
-      
-      bind = $mainMod, Q, exec, $terminal
-      bind = $mainMod, E, exec, dolphin
-      bind = $mainMod, SPACE, exec, wofi --show drun
-      bind = $mainMod, M, exit, 
-      
-      exec-once = waybar
-      exec-once = dunst
-      exec-once = systemctl --user start hyprpolkitagent
     owner: "{{ user_name }}"
     group: "{{ user_name }}"
     mode: '0644'
-    force: yes # Force overwrite to update keybinds
+    force: yes
+
+- name: Deploy Waybar Config (If present)
+  copy:
+    src: waybar/
+    dest: "/home/{{ user_name }}/.config/waybar/"
+    owner: "{{ user_name }}"
+    group: "{{ user_name }}"
+    mode: '0644'
+  ignore_errors: yes
+
+- name: Deploy Dunst Config (If present)
+  copy:
+    src: dunst/
+    dest: "/home/{{ user_name }}/.config/dunst/"
+    owner: "{{ user_name }}"
+    group: "{{ user_name }}"
+    mode: '0644'
+  ignore_errors: yes
