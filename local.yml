@@ -13,5 +13,5 @@
   # Run these roles in order
   roles:
     - base        # Always run first! (Sets up users, sudo, etc
-    # - desktop   # (Commented out for now until we build it)
+    - desktop     # Currently in testing
     # - apps      # (Commented out for now until we build it)

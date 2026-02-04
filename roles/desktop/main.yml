@@ -1,0 +1,95 @@
+# --- The Wayland Core ---
+
+- name: Install Critical System Utilities (Audio, Auth, Notifications)
+  pacman:
+    name:
+    - pipewire               # Audio Server
+    - wireplumber            # Audio Session Manager
+    - dunst                  # Notification Daemon (Prevents app freezes)
+    - hyprpolkitagent        # Authentication Agent (Popups for sudo password)
+    - qt5-wayland            # Qt5 App Support
+    - qt6-wayland            # Qt6 App Support
+    state: present
+
+- name: Install Hyprland Desktop Core
+  pacman:
+    name:
+    - hyprland
+    - kitty
+    - wofi
+    - waybar
+    - dolphin
+    - ttf-jetbrains-mono-nerd
+    state: present
+
+- name: Install Hyprland Desktop Portal (Required for Screen Sharing/OBS)
+  pacman: 
+    name: xdg-desktop-portal-hyprland
+    state: present
+
+# --- Configuration Directory Setup ---
+
+- name: Ensure Hyprland Config Directory Exists
+  file:
+    path: "/home/{{ user_name }}/.config/hypr"
+    state: directory
+    owner: "{{ user_name }}"
+    group: "{{ user_name }}"
+    mode: '0755'
+
+# --- Smart Environment Variables (VM vs Nvidia) ---
+
+- name: Generate Environment Config (VM Optimized)
+  copy:
+    dest: "/home/{{ user_name }}/.config/hypr/env.conf"
+    content: |
+      # Virtual Machine Optimization
+      env = WLR_NO_HARDWARE_CURSORS,1
+      env = WLR_RENDERER_ALLOW_SOFTWARE,1
+    owner: "{{ user_name }}"
+    group: "{{ user_name }}"
+    mode: '0644'
+  when: ansible_facts['virtualization_role'] == "guest"
+
+- name: Generate Environment Config (Nvidia/Physical Optimized)
+  copy:
+    dest: "/home/{{ user_name }}/.config/hypr/env.conf"
+    content: |
+      # Nvidia Hardware Optimization
+      env = LIBVA_DRIVER_NAME,nvidia
+      env = XDG_SESSION_TYPE,wayland
+      env = GBM_BACKEND,nvidia-drm
+      env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+      env = NVD_BACKEND,direct
+    owner: "{{ user_name }}"
+    group: "{{ user_name }}"
+    mode: '0644'
+  when: ansible_facts['virtualization_role'] != "guest"
+
+# --- Minimal Starter Config ---
+
+- name: Create Minimal Hyprland Config
+  copy:
+    dest: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
+    content: |
+      # --- Source the dynamic environment file ---
+      source = ~/.config/hypr/env.conf
+
+      # --- Monitor Config ---
+      monitor=,preferred,auto,1
+
+      # --- Keybinds ---
+      $mainMod = SUPER
+      bind = $mainMod, Q, exec, kitty
+      bind = $mainMod, E, exec, dolphin
+      bind = $mainMod, SPACE, exec, wofi --show drun
+      bind = $mainMod, M, exit, 
+
+      # --- Autostart Critical Services ---
+      exec-once = waybar
+      exec-once = dunst
+      exec-once = systemctl --user start hyprpolkitagent
+    owner: "{{ user_name }}"
+    group: "{{ user_name }}"
+    mode: '0644'
+    force: no # Only create if it doesn't exist
