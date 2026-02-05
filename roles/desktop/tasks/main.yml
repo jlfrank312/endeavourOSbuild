@@ -27,6 +27,7 @@
   pacman: 
     name:
     - hyprpaper              # Wallpaper
+    - archlinux-wallpaper
     - hyprlock               # Lock screen
     - hypridle               # Idle daemon
     - grim                   # Screenshot tool
