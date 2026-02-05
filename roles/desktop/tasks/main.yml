@@ -23,6 +23,18 @@
     - ttf-jetbrains-mono-nerd
     state: present
 
+- name: Install Hyprland Utilities
+  pacman: 
+    name:
+    - hyprpaper              # Wallpaper
+    - hyprlock               # Lock screen
+    - hypridle               # Idle daemon
+    - grim                   # Screenshot tool
+    - slurp                  # Region selctor
+    - wl-clipboard           # Clipboard utils
+    - cliphist               # Clipboard manager
+    state: present
+
 - name: Install Hyprland Desktop Portal (Required for Screen Sharing/OBS)
   pacman: 
     name: xdg-desktop-portal-hyprland
@@ -73,16 +85,21 @@
 
 # --- Static Configuration Deployment ---
 
-- name: Deploy Hyprland Config
+- name: Deploy Hyprland Configurations
   copy:
-    src: hypr/hyprland.conf
-    dest: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
+    src: "hypr/{{ item }}"
+    dest: "/home/{{ user_name }}/.config/hypr/{{ item }}"
     owner: "{{ user_name }}"
     group: "{{ user_name }}"
     mode: '0644'
     force: yes
+  loop:
+    - hyprland.conf
+    - hyprpaper.conf
+    - hyprlock.conf
+    - hypridle.conf
 
-- name: Deploy Waybar Config (If present)
+- name: Deploy Waybar Config                # Waybar = Taskbar
   copy:
     src: waybar/
     dest: "/home/{{ user_name }}/.config/waybar/"
@@ -91,7 +108,7 @@
     mode: '0644'
   ignore_errors: yes
 
-- name: Deploy Dunst Config (If present)
+- name: Deploy Dunst Config                  # Dunst = Notifications
   copy:
     src: dunst/
     dest: "/home/{{ user_name }}/.config/dunst/"
