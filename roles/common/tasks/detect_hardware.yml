@@ -1,0 +1,101 @@
+---
+# =============================================================================
+# Hardware Probing Commands
+# =============================================================================
+- name: Ensure pciutils is installed for accurate GPU detection
+  ansible.builtin.pacman:
+    name: pciutils
+    state: present
+
+- name: Probe PCI devices for GPU detection
+  ansible.builtin.command: lspci
+  register: lspci_output
+  changed_when: false
+
+- name: Probe CPU flags for x86_64-v3 support
+  ansible.builtin.command: grep -E "^flags|^Features" /proc/cpuinfo
+  register: cpuinfo_output
+  changed_when: false
+  failed_when: false
+
+- name: Probe for battery charge threshold support
+  ansible.builtin.stat:
+    path: /sys/class/power_supply/BAT0/charge_control_end_threshold
+  register: battery_threshold_stat
+
+- name: Probe root filesystem type
+  ansible.builtin.command: findmnt -n -o FSTYPE /
+  register: root_fs_output
+  changed_when: false
+  failed_when: false
+
+# =============================================================================
+# Custom Fact Construction
+# =============================================================================
+- name: Set core architecture and form factor facts
+  ansible.builtin.set_fact:
+    is_laptop: "{{ ansible_facts['form_factor'] in ['Notebook', 'Laptop', 'Portable', 'Sub Notebook'] }}"
+    is_desktop: "{{ ansible_facts['form_factor'] in ['Desktop', 'Tower', 'Mini Tower', 'All In One'] }}"
+    is_arm: "{{ ansible_facts['architecture'] in ['aarch64', 'armv7l'] }}"
+    is_virtual_guest: "{{ (ansible_facts['virtualization_role'] | default('none')) == 'guest' }}"
+    has_intel_cpu: "{{ 'Intel' in (ansible_facts['processor'] | join(' ')) }}"
+    root_fstype: "{{ (root_fs_output.stdout | default('unknown')) | trim }}"
+
+- name: Set derived platform facts
+  ansible.builtin.set_fact:
+    is_x86: "{{ not is_arm }}"
+    has_nvidia_gpu: >-
+      {{ (lspci_output.stdout_lines | default([]))
+         | select('search', 'NVIDIA')
+         | list | length > 0 }}
+    has_intel_gpu: >-
+      {{ (lspci_output.stdout_lines | default([]))
+         | select('search', 'VGA.*Intel|Intel.*VGA')
+         | list | length > 0 }}
+    has_amd_gpu: >-
+      {{ (lspci_output.stdout_lines | default([]))
+         | select('search', 'VGA.*(Advanced Micro Devices|AMD)|(Advanced Micro Devices|AMD).*VGA')
+         | list | length > 0 }}
+    supports_charge_threshold: "{{ battery_threshold_stat.stat.exists }}"
+
+- name: Set x86_64-v3 capability fact
+  ansible.builtin.set_fact:
+    supports_x86_64_v3: >-
+      {{ is_x86 and
+         (cpuinfo_output.rc | default(1) | int) == 0 and
+         'avx'   in (cpuinfo_output.stdout | default('')) and
+         'avx2'  in (cpuinfo_output.stdout | default('')) and
+         'bmi1'  in (cpuinfo_output.stdout | default('')) and
+         'bmi2'  in (cpuinfo_output.stdout | default('')) and
+         'f16c'  in (cpuinfo_output.stdout | default('')) and
+         'fma'   in (cpuinfo_output.stdout | default('')) and
+         'lzcnt' in (cpuinfo_output.stdout | default('')) and
+         'movbe' in (cpuinfo_output.stdout | default('')) and
+         'xsave' in (cpuinfo_output.stdout | default('')) }}
+
+# =============================================================================
+# Dynamic Group Assignments
+# =============================================================================
+- name: Assign host to 'desktops' group
+  ansible.builtin.add_host:
+    name: "{{ inventory_hostname }}"
+    groups: desktops
+  when: is_desktop or is_laptop
+
+- name: Assign host to 'laptops' group
+  ansible.builtin.add_host:
+    name: "{{ inventory_hostname }}"
+    groups: laptops
+  when: is_laptop
+
+- name: Assign host to 'pi' group
+  ansible.builtin.add_host:
+    name: "{{ inventory_hostname }}"
+    groups: pi
+  when: is_arm
+
+- name: Assign host to 'nvidia_hosts' group
+  ansible.builtin.add_host:
+    name: "{{ inventory_hostname }}"
+    groups: nvidia_hosts
+  when: has_nvidia_gpu | default(false)

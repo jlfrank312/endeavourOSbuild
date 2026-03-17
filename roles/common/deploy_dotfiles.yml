@@ -1,0 +1,131 @@
+---
+# =============================================================================
+# 1. State Checks
+# =============================================================================
+- name: Check if host-specific dotfiles directory exists
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/dotfiles/{{ ansible_hostname }}"
+  register: host_dotfiles_dir
+  delegate_to: localhost
+  become: false
+
+# NOTE: The filetree lookup plugin returns items with state 'file', 'directory', 
+# or 'link'. Symlinks are intentionally omitted from these tasks to enforce 
+# explicit copying and templating of regular files.
+
+# =============================================================================
+# 2. Common Desktop Dotfiles
+# =============================================================================
+- name: Ensure directories exist for common dotfiles
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/{{ item.path }}"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/common/"
+  when:
+    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - item.state == 'directory'
+
+- name: Deploy common static dotfiles
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "/home/{{ user_name }}/{{ item.path }}"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/common/"
+  when:
+    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - item.state == 'file'
+    - not item.path.endswith('.j2')
+
+- name: Deploy common templated dotfiles
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/home/{{ user_name }}/{{ item.path | regex_replace('\\.j2$', '') }}"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/common/"
+  when:
+    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - item.state == 'file'
+    - item.path.endswith('.j2')
+
+# =============================================================================
+# 3. Host-Specific Dotfiles (e.g., main-pc, Tabula, pi)
+# =============================================================================
+- name: Ensure directories exist for host-specific dotfiles
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/{{ item.path }}"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_hostname }}/"
+  when:
+    - host_dotfiles_dir.stat.exists
+    - item.state == 'directory'
+
+- name: Deploy host-specific static dotfiles
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "/home/{{ user_name }}/{{ item.path }}"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_hostname }}/"
+  when:
+    - host_dotfiles_dir.stat.exists
+    - item.state == 'file'
+    - not item.path.endswith('.j2')
+
+- name: Deploy host-specific templated dotfiles
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/home/{{ user_name }}/{{ item.path | regex_replace('\\.j2$', '') }}"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_hostname }}/"
+  when:
+    - host_dotfiles_dir.stat.exists
+    - item.state == 'file'
+    - item.path.endswith('.j2')
+
+# =============================================================================
+# 4. Illogical-Impulse Fallback (ii-compat)
+# =============================================================================
+- name: Ensure directories exist for ii-compat fallback dotfiles
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/{{ item.path }}"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/ii-compat/"
+  when:
+    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - not (use_illogical_impulse | default(true))
+    - item.state == 'directory'
+
+- name: Deploy ii-compat static dotfiles
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "/home/{{ user_name }}/{{ item.path }}"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/ii-compat/"
+  when:
+    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - not (use_illogical_impulse | default(true))
+    - item.state == 'file'
+    - not item.path.endswith('.j2')
+
+- name: Deploy ii-compat templated dotfiles
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/home/{{ user_name }}/{{ item.path | regex_replace('\\.j2$', '') }}"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/ii-compat/"
+  when:
+    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - not (use_illogical_impulse | default(true))
+    - item.state == 'file'
+    - item.path.endswith('.j2')

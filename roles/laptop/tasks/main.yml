@@ -1,0 +1,6 @@
+#   --- Laptop battery management apps ---
+- name: Install TLP
+  pacman: 
+      name: 
+        - tlp
+      state: present

@@ -1,0 +1,127 @@
+---
+# =============================================================================
+# 1. Hardware Detection
+# =============================================================================
+- name: Run hardware detection engine
+  ansible.builtin.include_tasks: detect_hardware.yml
+
+# =============================================================================
+# 2. Temporary Privilege Escalation (Sudoers)
+# =============================================================================
+- name: Check if yay is installed
+  ansible.builtin.stat:
+    path: /usr/bin/yay
+  register: yay_stat
+
+- name: Initialise sudoers_result to safe default
+  ansible.builtin.set_fact:
+    sudoers_result:
+      changed: false
+  when: yay_stat.stat.exists
+
+- name: Check for existing sudoers configuration
+  ansible.builtin.stat:
+    path: /etc/sudoers.d/{{ user_name }}
+  register: sudoers_preexisting
+
+- name: Configure temporary passwordless sudo for yay bootstrap
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/{{ user_name }}
+    create: yes
+    mode: '0440'
+    line: '{{ user_name }} ALL=(ALL) NOPASSWD: ALL'
+    validate: 'visudo -cf %s'
+  when: not yay_stat.stat.exists
+  register: sudoers_result
+
+# =============================================================================
+# 3. Base Packages & mDNS (Avahi) Setup
+# =============================================================================
+- name: Install base system utilities and Avahi
+  ansible.builtin.pacman:
+    name:
+      - base-devel
+      - git
+      - curl
+      - wget
+      - rsync
+      - avahi
+      - nss-mdns
+    state: present
+    update_cache: false
+
+- name: Enable and start Avahi daemon
+  ansible.builtin.systemd:
+    name: avahi-daemon
+    enabled: yes
+    state: started
+
+- name: Configure nsswitch.conf for mDNS hostname resolution
+  ansible.builtin.lineinfile:
+    path: /etc/nsswitch.conf
+    regexp: '^hosts:'
+    line: 'hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns'
+    state: present
+
+# =============================================================================
+# 4. Yay (AUR Helper) Setup
+# =============================================================================
+
+- name: Bootstrap yay from AUR (if missing)
+  ansible.builtin.shell: |
+    git clone https://aur.archlinux.org/yay.git /tmp/yay-build
+    cd /tmp/yay-build
+    makepkg -si --noconfirm
+  args:
+    executable: /bin/bash
+  become: false
+  when: not yay_stat.stat.exists
+  changed_when: true
+
+- name: Clean up yay build directory
+  ansible.builtin.file:
+    path: /tmp/yay-build
+    state: absent
+
+- name: Ensure yay config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.config/yay"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+
+- name: Configure yay defaults (removemake=no, noconfirm=true)
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.config/yay/config.json"
+    owner: "{{ user_name }}"
+    mode: '0644'
+    content: |
+      {
+        "removeMake": "no",
+        "noconfirm": true
+      }
+
+# =============================================================================
+# 5. Security Cleanup
+# =============================================================================
+- name: Remove NOPASSWD line added for yay bootstrap
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/{{ user_name }}
+    line: '{{ user_name }} ALL=(ALL) NOPASSWD: ALL'
+    state: absent
+    validate: 'visudo -cf %s'
+  when: sudoers_result is changed
+
+- name: Remove sudoers file if it was created by this playbook
+  ansible.builtin.file:
+    path: /etc/sudoers.d/{{ user_name }}
+    state: absent
+  when:
+    - sudoers_result is changed
+    - not sudoers_preexisting.stat.exists
+
+# =============================================================================
+# 6. Dotfiles Deployment
+# =============================================================================
+- name: Deploy managed dotfiles
+  ansible.builtin.include_tasks: deploy_dotfiles.yml
