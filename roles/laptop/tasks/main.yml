@@ -1,6 +1,69 @@
-#   --- Laptop battery management apps ---
+---
+# =============================================================================
+# 1. auto-cpufreq Setup
+# =============================================================================
+- name: Install python-typing_extensions (Required runtime dependency)
+  ansible.builtin.pacman:
+    name: python-typing_extensions
+    state: present
+
+- name: Install auto-cpufreq from AUR
+  kewlfft.aur.aur:
+    name: auto-cpufreq
+    state: present
+  become_user: "{{ user_name }}"
+
+- name: Enable and start auto-cpufreq service
+  ansible.builtin.systemd:
+    name: auto-cpufreq
+    enabled: yes
+    state: started
+
+# =============================================================================
+# 2. TLP Setup (Battery Management)
+# =============================================================================
 - name: Install TLP
-  pacman: 
-      name: 
-        - tlp
-      state: present
+  ansible.builtin.pacman:
+    name: tlp
+    state: present
+
+- name: Mask tlp-sleep service to prevent auto-cpufreq conflicts
+  ansible.builtin.systemd:
+    name: tlp-sleep.service
+    masked: yes
+
+- name: Deploy TLP configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/tlp.conf.j2"
+    dest: /etc/tlp.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart TLP
+
+- name: Enable and start TLP service
+  ansible.builtin.systemd:
+    name: tlp
+    enabled: yes
+    state: started
+
+# =============================================================================
+# 3. Diagnostics & Firewall
+# =============================================================================
+- name: Install powertop (Intel diagnostics)
+  ansible.builtin.pacman:
+    name: powertop
+    state: present
+  when: has_intel_cpu | default(false)
+
+- name: Install firewalld
+  ansible.builtin.pacman:
+    name: firewalld
+    state: present
+
+- name: Enable and start firewalld service
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: yes
+    state: started
+    

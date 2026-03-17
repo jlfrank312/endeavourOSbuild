@@ -1,0 +1,47 @@
+# =============================================================================
+# 1. Load snapshot
+# =============================================================================
+- name: Load II dependency snapshot
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/roles/ii-compat/vars/snapshot.yml"
+
+- name: Abort if snapshot has not been generated
+  ansible.builtin.fail:
+    msg: >
+      roles/ii-compat/vars/snapshot.yml is empty.
+      Run 'make snapshot-ii' after verifying II is working on this machine
+      to generate the package list before using the ii-compat role.
+  when: ii_compat_packages | length == 0
+
+# =============================================================================
+# 2. Install packages from snapshot
+# =============================================================================
+
+# Attempt to install all snapshot packages via pacman first.
+# Packages not found in official repos will be collected in the failed list
+# and retried via AUR. This handles the mixed repo/AUR reality of II's
+# dependency tree without requiring a manually maintained separation.
+- name: Attempt to install snapshot packages via pacman
+  ansible.builtin.pacman:
+    name: "{{ ii_compat_packages }}"
+    state: present
+  register: pacman_result
+  failed_when: false
+
+# NOTE: The retry-via-AUR logic below is a placeholder.
+# On first real test run, inspect pacman_result.stderr to identify
+# which packages failed (typically "target not found: <pkg>") and
+# verify the AUR fallback catches them correctly.
+- name: Collect packages not found in official repos
+  ansible.builtin.set_fact:
+    aur_fallback_packages: >-
+      {{ pacman_result.stderr | default('')
+         | regex_findall("target not found: (\\S+)")
+         | list }}
+
+- name: Install AUR fallback packages
+  kewlfft.aur.aur:
+    name: "{{ aur_fallback_packages }}"
+    state: present
+  become_user: "{{ user_name }}"
+  when: aur_fallback_packages | length > 0
