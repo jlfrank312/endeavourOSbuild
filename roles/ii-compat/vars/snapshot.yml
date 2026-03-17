@@ -1,0 +1,3 @@
+# Placeholder — run 'make snapshot-ii' after verifying II is working
+# to populate this file before using the ii-compat role
+ii_compat_packages: []

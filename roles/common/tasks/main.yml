@@ -11,13 +11,13 @@
 - name: Check if yay is installed
   ansible.builtin.stat:
     path: /usr/bin/yay
-  register: yay_stat
+  register: common_yay_stat
 
 - name: Initialise sudoers_result to safe default
   ansible.builtin.set_fact:
     sudoers_result:
       changed: false
-  when: yay_stat.stat.exists
+  when: common_yay_stat.stat.exists
 
 - name: Check for existing sudoers configuration
   ansible.builtin.stat:
@@ -31,7 +31,7 @@
     mode: '0440'
     line: '{{ user_name }} ALL=(ALL) NOPASSWD: ALL'
     validate: 'visudo -cf %s'
-  when: not yay_stat.stat.exists
+  when: not common_yay_stat.stat.exists
   register: sudoers_result
 
 # =============================================================================
@@ -75,7 +75,7 @@
   args:
     executable: /bin/bash
   become: false
-  when: not yay_stat.stat.exists
+  when: not common_yay_stat.stat.exists
   changed_when: true
 
 - name: Clean up yay build directory
