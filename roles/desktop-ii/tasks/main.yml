@@ -1,19 +1,8 @@
-
+---
 # Actuall II install goes above here
 - name: Snapshot II dependencies for ii-compat fallback
   ansible.builtin.shell: |
-    pacman -Qi \
-      illogical-impulse-basic \
-      illogical-impulse-audio \
-      illogical-impulse-widgets \
-      illogical-impulse-hyprland \
-      illogical-impulse-fonts-themes \
-      illogical-impulse-kde \
-      illogical-impulse-portal \
-      illogical-impulse-screencapture \
-      illogical-impulse-backlight \
-      illogical-impulse-toolkit \
-      illogical-impulse-python \
+    pacman -Qq | grep '^illogical-impulse-' | xargs pacman -Qi \
     | grep "^Depends On" \
     | sed 's/Depends On\s*:\s*//' \
     | tr ' ' '\n' \
@@ -23,6 +12,7 @@
   register: ii_snapshot_raw
   changed_when: false
   become: false
+  tags: [snapshot-ii]
 
 - name: Write II dependency snapshot to ii-compat vars
   ansible.builtin.copy:
