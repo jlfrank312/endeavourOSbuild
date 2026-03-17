@@ -1,0 +1,12 @@
+---
+- name: Install Nvidia Drivers (CachyOS 580xx Series) 
+  pacman:
+    name:
+      - egl-gbm
+      - egl-wayland
+      - nvidia-580xx-dkms
+      - nvidia-580xx-utils
+      - nvidia-580xx-settings
+    state: present
+  # Only run if NOT a guest VM (i.e., run on bare metal host)
+  when: ansible_facts['virtualization_role'] != "guest"

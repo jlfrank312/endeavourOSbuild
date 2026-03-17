@@ -14,12 +14,12 @@
   gather_facts: false
 
   roles:
-    - role: cachyos
+    - role: cachyos-conversion
       when: is_x86 | default(false) and supports_x86_64_v3 | default(false)
 
     - role: safety
 
-    - role: nvidia
+    - role: nvidia-gpu
       when: has_nvidia_gpu | default(false) and not is_virtual_guest | default(false)
 
     - role: intel-gpu
