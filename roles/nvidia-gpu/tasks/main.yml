@@ -1,6 +1,9 @@
 ---
-- name: Install Nvidia Drivers (CachyOS 580xx Series) 
-  pacman:
+# =============================================================================
+# 1. Driver Installation
+# =============================================================================
+- name: Install NVIDIA drivers (CachyOS 580xx series)
+  ansible.builtin.pacman:
     name:
       - egl-gbm
       - egl-wayland
@@ -8,5 +11,47 @@
       - nvidia-580xx-utils
       - nvidia-580xx-settings
     state: present
-  # Only run if NOT a guest VM (i.e., run on bare metal host)
-  when: ansible_facts['virtualization_role'] != "guest"
+
+# =============================================================================
+# 2. Kernel Parameters
+# =============================================================================
+- name: Set NVIDIA kernel parameters in GRUB
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet nvidia-drm.modeset=1 nvidia_drm.fbdev=1"'
+    backup: yes
+  notify: Regenerate GRUB
+  when: >
+    'nvidia-drm.modeset=1' not in
+    (lookup('file', '/etc/default/grub') | default(''))
+
+# =============================================================================
+# 3. Hyprland Environment Variables
+# =============================================================================
+- name: Ensure hyprland config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.config/hypr"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+
+- name: Deploy NVIDIA Hyprland environment variables
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.config/hypr/nvidia-env.conf"
+    owner: "{{ user_name }}"
+    mode: '0644'
+    content: |
+      # NVIDIA Wayland environment variables
+      # Managed by Ansible - do not edit manually
+      env = LIBVA_DRIVER_NAME,nvidia
+      env = XDG_SESSION_TYPE,wayland
+      env = GBM_BACKEND,nvidia-drm
+      env = __GLX_VENDOR_LIBRARY_NAME,nvidia
+      env = NVD_BACKEND,direct
+
+- name: Ensure hyprland.conf sources NVIDIA env file
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
+    line: "source = ~/.config/hypr/nvidia-env.conf"
+    state: present

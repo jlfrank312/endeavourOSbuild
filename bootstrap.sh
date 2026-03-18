@@ -1,5 +1,6 @@
 #!/bin/bash
-set -e # Exit immediately if a command fails
+#set -e # Exit immediately if a command fails
+set -euo pipefail
 
 echo ":: Starting Infrastructure Bootstrap ::"
 

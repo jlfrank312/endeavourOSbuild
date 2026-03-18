@@ -2,22 +2,24 @@
 # --- Safety Tools ---
 
 - name: Install Kernel Safeguards (LTS)
-  pacman:
+  community.general.pacman:
     name:
       - linux-lts
       - linux-lts-headers
     state: present
+  when: is_x86 | default(false)
 
 - name: Install BTRFS Safeguards (Snapper)
-  pacman:
-    name: 
+  community.general.pacman:
+    name:
       - snapper
       - snap-pac         # Auto-snapshot on pacman update
       - btrfs-assistant  # GUI for managing snapshots
     state: present
+  when: root_fstype == 'btrfs'
 
 - name: Enable Snapper cleanup timer (Prevent disk filling)
-  systemd:
+  ansible.builtin.systemd:
     name: snapper-cleanup.timer
     enabled: yes
     state: started
@@ -25,12 +27,13 @@
 # --- Activate Recovery Utilities ---
 
 - name: Initialize Snapper Root Config
-  command: snapper -c root create-config /
-  args: 
+  ansible.builtin.command: snapper -c root create-config /
+  args:
     creates: /etc/snapper/configs/root
-    
+  when: root_fstype == 'btrfs'
+
 - name: Configure Snapper Permissions
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/snapper/configs/root
     regexp: '{{ item.regexp }}'
     line: '{{ item.line }}'
@@ -38,4 +41,4 @@
     - { regexp: '^ALLOW_GROUPS=.*', line: 'ALLOW_GROUPS="wheel"' }
     - { regexp: '^TIMELINE_LIMIT_HOURLY=.*', line: 'TIMELINE_LIMIT_HOURLY="5"' }
     - { regexp: '^TIMELINE_LIMIT_DAILY=.*', line: 'TIMELINE_LIMIT_DAILY="7"' }
-    
+  when: root_fstype == 'btrfs'

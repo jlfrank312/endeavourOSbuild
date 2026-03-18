@@ -1,1 +1,5 @@
-# Currently empty
+---
+# Feature flags for all desktop and laptop machines
+use_illogical_impulse: true
+
+use_hyprland: true

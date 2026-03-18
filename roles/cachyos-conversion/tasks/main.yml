@@ -2,22 +2,22 @@
 # --- Initial Pacman Upgrade, EndeavourOS Repos ---
 
 - name: Upgrade Pacman Cache to Current
-  ansible.builtin.pacman:
+  community.general.pacman:
     update_cache: yes
     upgrade: yes
 
 # --- Add CachyOS Repo Keys ---
 
 - name: Import CachyOS GPG Key
-  command: pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
+  ansible.builtin.command: pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
 
 - name: Locally Sign CachyOS GPG Key
-  command: pacman-key --lsign-key F3B607488DB35A47
+  ansible.builtin.command: pacman-key --lsign-key F3B607488DB35A47
 
 # --- Preparation to Convert to CachyOS Repo Mirrors ---
 
 - name: Create temporary CachyOS mirrorlist
-  copy:
+  ansible.builtin.copy:
     dest: /etc/pacman.d/cachyos-mirrorlist
     content: |
       #Temporary bootstrap mirror
@@ -25,7 +25,7 @@
     mode: '0644'
 
 - name: Create temporary CachyOS V3 mirrorlist
-  copy:
+  ansible.builtin.copy:
     dest: /etc/pacman.d/cachyos-v3-mirrorlist
     content: |
       #Temporary bootstrap mirror - Yes, this one is gross. I haven't found a better way yet.
@@ -33,7 +33,7 @@
     mode: '0644'
 
 - name: Enable CachyOS Repositories in pacman.conf
-  blockinfile:
+  ansible.builtin.blockinfile:
     path: /etc/pacman.conf
     insertbefore: "^#?\\[core\\]"
     block: |
@@ -52,7 +52,7 @@
 
 
 - name: Install CachyOS Keyring and Mirrorlists
-  pacman:
+  community.general.pacman:
     name:
       - cachyos-keyring
       - cachyos-mirrorlist
@@ -64,21 +64,21 @@
 # --- CachyOS Conversion ---
 
 - name: Allow x86_64-v3 architecture in Pacman
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: /etc/pacman.conf
     regexp: '^Architecture = auto'
     line: 'Architecture = auto x86_64_v3'
 
 - name: Convert Pacman Cache to CachyOS
   # Forces Pacman to allow downgrading of packages if called for by newly-added CachyOS mirrors
-  command: pacman -Syyuu --noconfirm
+  ansible.builtin.command: pacman -Syyuu --noconfirm
   register: cachyos_conversion
   changed_when: "'there is nothing to do' not in cachyos_conversion.stdout"
 
 # --- CachyOS Optimizations ---
 
 - name: Install CachyOS Kernel
-  pacman:
+  community.general.pacman:
     name:
       - linux-cachyos
       - linux-cachyos-headers
@@ -88,6 +88,6 @@
 # --- Final Convergence of Pacman Cache ---
 
 - name: Upgrade Pacman Cache to Current
-  ansible.builtin.pacman:
+  community.general.pacman:
     update_cache: yes
     upgrade: yes

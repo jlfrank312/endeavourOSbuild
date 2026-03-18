@@ -11,8 +11,8 @@
     | sort -u
   register: ii_snapshot_raw
   changed_when: false
-  become: false
   tags: [snapshot-ii]
+  become: false
 
 - name: Write II dependency snapshot to ii-compat vars
   ansible.builtin.copy:
@@ -26,4 +26,5 @@
         - {{ pkg }}
       {% endfor %}
   delegate_to: localhost
+  tags: [snapshot-ii]
   become: false
