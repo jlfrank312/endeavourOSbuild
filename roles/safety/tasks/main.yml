@@ -22,14 +22,16 @@
     name:
       - btrfs-assistant  # GUI for managing snapshots
     state: present
-  when: is_desktop | default(false) or is_laptop | default(false)
+  when:
+    - root_fstype == 'btrfs'
+    - is_desktop | default(false) or is_laptop | default(false)
 
 - name: Enable Snapper cleanup timer (Prevent disk filling)
   ansible.builtin.systemd:
     name: snapper-cleanup.timer
     enabled: yes
     state: started
-    when: root_fstype == 'btrfs'
+  when: root_fstype == 'btrfs'
 
 # --- Activate Recovery Utilities ---
 

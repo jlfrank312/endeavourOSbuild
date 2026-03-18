@@ -15,40 +15,56 @@
 
   roles:
     - role: cachyos-conversion
-      when: is_x86 | default(false) and supports_x86_64_v3 | default(false)
+      when: 
+        - is_x86 | default(false)
+        - supports_x86_64_v3 | default(false)
 
     - role: safety
 
     - role: nvidia-gpu
-      when: has_nvidia_gpu | default(false) and not is_virtual_guest | default(false)
+      when: 
+        - has_nvidia_gpu | default(false)
+        - not (is_virtual_guest | default(false))
 
     - role: intel-gpu
-      when: has_intel_gpu | default(false)
+      when: 
+        - has_intel_gpu | default(false)
 
     - role: desktop-ii
-      when: (is_desktop | default(false) or is_laptop | default(false)) and use_illogical_impulse | default(false)
+      when:
+        - (is_desktop | default(false) or is_laptop | default(false))
+        - use_illogical_impulse | default(false)
 
     - role: ii-compat
-      when: (is_desktop | default(false) or is_laptop | default(false)) and not use_illogical_impulse | default(true)
+      when:
+        - (is_desktop | default(false) or is_laptop | default(false))
+        - not (use_illogical_impulse | default(true))
 
     - role: laptop
-      when: is_laptop | default(false)
+      when:
+        - is_laptop | default(false)
 
     - role: pc-apps
-      when: is_laptop | default(false) or is_desktop | default(false)
+      when:
+        - (is_laptop | default(false) or is_desktop | default(false))
 
     - role: gaming
-      when: is_desktop | default(false) or is_laptop | default(false)
+      when:
+        - (is_desktop | default(false) or is_laptop | default(false))
 
     - role: development
-      when: is_desktop | default(false) or is_laptop | default(false)
+      when:
+        - (is_desktop | default(false) or is_laptop | default(false))
 
     - role: remote-access
 
     - role: media-server
-      when: has_nvidia_gpu | default(false) and is_desktop | default(false)
+      when: 
+        - has_nvidia_gpu | default(false)
+        - is_desktop | default(false)
 
     - role: pi-services
-      when: is_arm | default(false)
+      when: 
+        - is_arm | default(false)
 
     - role: autoupdate

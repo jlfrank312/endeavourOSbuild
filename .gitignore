@@ -2,7 +2,6 @@
 *.retry
 *.log
 inventory.ini
-ansible.cfg
 
 # --- Secrets (Critical) ---
 secrets.yml
@@ -14,3 +13,4 @@ __pycache__/
 *.py[cod]
 .venv/
 .DS_Store
+Thumbs.db
