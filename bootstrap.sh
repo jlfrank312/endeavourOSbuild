@@ -14,18 +14,17 @@ sudo pacman -Syu --needed --noconfirm git ansible base-devel
 
 # 2. Install yay (AUR helper)
 if ! command -v yay &> /dev/null; then
-	echo ":: Installing yay from AUR ::"
-	# Clone to temporary directory to build
-	git clone https://aur.archlinux.org/yay.git /tmp/yay-build
-	cd /tmp/yay-build
-	makepkg -si --noconfirm
-	cd - > /dev/null
-	rm -rf /tmp/yay-build
+    ORIGINAL_DIR=$(pwd)
+    trap "cd '$ORIGINAL_DIR'; rm -rf /tmp/yay-build" EXIT
+    echo ":: Installing yay from AUR ::"
+    git clone https://aur.archlinux.org/yay.git /tmp/yay-build
+    cd /tmp/yay-build
+    makepkg -si --noconfirm
+    cd - > /dev/null
+    rm -rf /tmp/yay-build
 else
-	echo ":: yay is already installed ::"
+    echo ":: yay is already installed ::"
 fi
-
-
 
 # 3. Self-Update
 # Ensures you're using the latest version of endeavourOSbuild.git

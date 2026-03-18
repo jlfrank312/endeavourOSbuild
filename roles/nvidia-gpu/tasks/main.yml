@@ -25,33 +25,4 @@
   when: >
     'nvidia-drm.modeset=1' not in
     (lookup('file', '/etc/default/grub') | default(''))
-
-# =============================================================================
-# 3. Hyprland Environment Variables
-# =============================================================================
-- name: Ensure hyprland config directory exists
-  ansible.builtin.file:
-    path: "/home/{{ user_name }}/.config/hypr"
-    state: directory
-    owner: "{{ user_name }}"
-    mode: '0755'
-
-- name: Deploy NVIDIA Hyprland environment variables
-  ansible.builtin.copy:
-    dest: "/home/{{ user_name }}/.config/hypr/nvidia-env.conf"
-    owner: "{{ user_name }}"
-    mode: '0644'
-    content: |
-      # NVIDIA Wayland environment variables
-      # Managed by Ansible - do not edit manually
-      env = LIBVA_DRIVER_NAME,nvidia
-      env = XDG_SESSION_TYPE,wayland
-      env = GBM_BACKEND,nvidia-drm
-      env = __GLX_VENDOR_LIBRARY_NAME,nvidia
-      env = NVD_BACKEND,direct
-
-- name: Ensure hyprland.conf sources NVIDIA env file
-  ansible.builtin.lineinfile:
-    path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
-    line: "source = ~/.config/hypr/nvidia-env.conf"
-    state: present
+    

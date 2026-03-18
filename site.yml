@@ -31,7 +31,7 @@
     - role: ii-compat
       when: (is_desktop | default(false) or is_laptop | default(false)) and not use_illogical_impulse | default(true)
 
-    - role: laptop 
+    - role: laptop
       when: is_laptop | default(false)
 
     - role: pc-apps

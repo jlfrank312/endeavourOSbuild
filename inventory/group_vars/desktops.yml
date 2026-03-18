@@ -2,4 +2,4 @@
 # Feature flags for all desktop and laptop machines
 use_illogical_impulse: true
 
-use_hyprland: true
+use_hyprland: true # intended for future use, not used currently

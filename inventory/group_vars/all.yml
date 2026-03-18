@@ -1,13 +1,9 @@
 # Your User Details
 
-user_name: jordan  # CHANGE THIS to your actual linux username
+user_name: "{{ vault_user_name }}"
 
-git_name: "endeavourOSbuild"
+git_name: "{{ vault_git_name }}"
 
-git_email: "jlfrank312@gmail.com"
+git_email: "{{ vault_git_email }}"
 
-
-
-# System Settings
-
-timezone: "America/Los_Angeles" # Or your timezone
+timezone: "America/Los_Angeles"
