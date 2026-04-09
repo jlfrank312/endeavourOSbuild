@@ -20,6 +20,16 @@
   register: ii_firstrun
   become: false
 
+- name: Grant temporary passwordless sudo for II installer
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers.d/{{ user_name }}
+    create: yes
+    mode: '0440'
+    line: '{{ user_name }} ALL=(ALL) NOPASSWD: ALL'
+    validate: 'visudo -cf %s'
+  become: true
+  when: not ii_firstrun.stat.exists
+
 - name: Run II full installer
   ansible.builtin.shell: |
     SKIP_ALLGREETING=1 ./setup install --skip-sysupdate --skip-backup -f
@@ -30,6 +40,13 @@
   changed_when: true
   when: not ii_firstrun.stat.exists
   tags: [update-ii]
+
+- name: Remove temporary passwordless sudo after II installer
+  ansible.builtin.file:
+    path: /etc/sudoers.d/{{ user_name }}
+    state: absent
+  become: true
+  when: not ii_firstrun.stat.exists
 
 # =============================================================================
 # 3-I. Hyprland Environment Setup (Intel)
