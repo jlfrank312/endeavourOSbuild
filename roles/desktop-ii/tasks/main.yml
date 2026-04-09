@@ -32,6 +32,7 @@
 
 - name: Run II full installer
   ansible.builtin.shell: |
+    echo "{{ ansible_become_password }}" | sudo -S -v 2>/dev/null
     SKIP_ALLGREETING=1 ./setup install --skip-sysupdate --skip-backup -f
   args:
     chdir: "/home/{{ user_name }}/.cache/dots-hyprland"
@@ -40,6 +41,8 @@
   changed_when: true
   when: not ii_firstrun.stat.exists
   tags: [update-ii]
+  environment:
+    SUDO_ASKPASS: /bin/false
 
 - name: Remove temporary passwordless sudo after II installer
   ansible.builtin.file:
