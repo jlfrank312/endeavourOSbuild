@@ -34,7 +34,7 @@
 - name: Collect packages not found in official repos
   ansible.builtin.set_fact:
     aur_fallback_packages: >-
-      {{ pacman_result.stderr | default('')
+      {{ pacman_result.stdout | default('')
          | regex_findall("target not found: (\\S+)")
          | list }}
 

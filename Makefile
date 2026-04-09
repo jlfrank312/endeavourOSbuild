@@ -15,3 +15,7 @@ run-pi:
 
 snapshot-ii:
 	ansible-playbook site.yml -i "localhost," --connection=local --tags snapshot-ii --ask-become-pass
+
+update-ii:
+	ansible-playbook site.yml -i "localhost," --connection=local \
+	  --tags update-ii --ask-become-pass

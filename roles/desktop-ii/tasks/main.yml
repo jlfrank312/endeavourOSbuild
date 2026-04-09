@@ -14,6 +14,12 @@
 # =============================================================================
 # 2. Run II installer — let it do everything
 # =============================================================================
+- name: Check if II has been previously installed
+  ansible.builtin.stat:
+    path: "/home/{{ user_name }}/.config/illogical-impulse/installed_true"
+  register: ii_firstrun
+  become: false
+
 - name: Run II full installer
   ansible.builtin.shell: |
     SKIP_ALLGREETING=1 ./setup install --skip-sysupdate --skip-backup -f
@@ -22,6 +28,8 @@
     executable: /bin/bash
   become: false
   changed_when: true
+  when: not ii_firstrun.stat.exists
+  tags: [update-ii]
 
 
 # =============================================================================
