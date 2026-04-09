@@ -1,4 +1,10 @@
 ---
+- name: Restart auto-cpufreq
+  ansible.builtin.systemd:
+    name: auto-cpufreq
+    state: restarted
+  become: true
+
 - name: Restart TLP
   ansible.builtin.systemd:
     name: tlp

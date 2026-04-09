@@ -25,4 +25,3 @@
   when: >
     'nvidia-drm.modeset=1' not in
     (lookup('file', '/etc/default/grub') | default(''))
-    

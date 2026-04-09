@@ -13,6 +13,15 @@
     state: present
   become_user: "{{ user_name }}"
 
+- name: Deploy auto-cpufreq configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/auto-cpufreq.conf.j2"
+    dest: /etc/auto-cpufreq.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart auto-cpufreq
+
 - name: Enable and start auto-cpufreq service
   ansible.builtin.systemd:
     name: auto-cpufreq
