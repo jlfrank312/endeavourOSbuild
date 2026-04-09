@@ -7,6 +7,11 @@
     name: python-typing_extensions
     state: present
 
+- name: Prime sudo credentials for AUR builds
+  ansible.builtin.shell: |
+    echo "{{ ansible_become_password }}" | sudo -S -v 2>/dev/null
+  changed_when: false
+
 - name: Install auto-cpufreq from AUR
   kewlfft.aur.aur:
     name: auto-cpufreq
