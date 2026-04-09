@@ -1,18 +1,35 @@
 ---
 # =============================================================================
-# 1. Build + Install II
+# 1. Clone / update II repository
 # =============================================================================
+- name: Clone or update II repository
+  ansible.builtin.git:
+    repo: https://github.com/end-4/dots-hyprland.git
+    dest: "/home/{{ user_name }}/.cache/dots-hyprland"
+    depth: 1
+    update: yes
+    force: yes
+  become: false
 
 # =============================================================================
-# 2. Deploy II Config
+# 2. Run II installer — let it do everything
 # =============================================================================
+- name: Run II full installer
+  ansible.builtin.shell: |
+    SKIP_ALLGREETING=1 ./setup install --skip-sysupdate --skip-backup -f
+  args:
+    chdir: "/home/{{ user_name }}/.cache/dots-hyprland"
+    executable: /bin/bash
+  become: false
+  changed_when: true
+
 
 # =============================================================================
 # 3. Hyprland Environment Setup (NVidia)
 # =============================================================================
 - name: Ensure hyprland config directory exists
   ansible.builtin.file:
-    path: "/home/{{ user_name }}/.config/hypr"
+    path: "/home/{{ user_name }}/.config/hypr/custom"
     state: directory
     owner: "{{ user_name }}"
     mode: '0755'
@@ -20,7 +37,7 @@
 
 - name: Deploy NVIDIA Hyprland environment variables
   ansible.builtin.copy:
-    dest: "/home/{{ user_name }}/.config/hypr/nvidia-env.conf"
+    dest: "/home/{{ user_name }}/.config/hypr/custom/nvidia-env.conf"
     owner: "{{ user_name }}"
     mode: '0644'
     content: |
@@ -36,7 +53,7 @@
 - name: Ensure hyprland.conf sources NVIDIA env file
   ansible.builtin.lineinfile:
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
-    line: "source = ~/.config/hypr/nvidia-env.conf"
+    line: "source = ~/.config/hypr/custom/nvidia-env.conf"
     state: present
   when: has_nvidia_gpu | default(false)
 
@@ -55,6 +72,7 @@
   register: ii_snapshot_raw
   changed_when: false
   tags: [snapshot-ii]
+  when: "'snapshot-ii' in ansible_run_tags"
   become: false
 
 - name: Write II dependency snapshot to ii-compat vars
@@ -70,4 +88,5 @@
       {% endfor %}
   delegate_to: localhost
   tags: [snapshot-ii]
+  when: "'snapshot-ii' in ansible_run_tags"
   become: false
