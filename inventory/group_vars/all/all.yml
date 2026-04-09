@@ -7,3 +7,5 @@ git_name: "{{ vault_git_name }}"
 git_email: "{{ vault_git_email }}"
 
 timezone: "America/Los_Angeles"
+
+ansible_become_password: "{{ vault_become_password }}"
