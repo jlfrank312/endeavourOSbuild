@@ -1,0 +1,8 @@
+# Hyprland display configuration
+# Managed by Ansible - do not edit manually
+# Values configured in inventory/host_vars/<hostname>.yml
+
+misc {
+    vfr = {{ hyprland_vfr | default(1) }}
+    vrr = {{ hyprland_vrr | default(1) }}
+}

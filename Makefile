@@ -8,7 +8,7 @@ run-pc:
 	ansible-playbook site.yml -i inventory/hosts.yml --limit main-pc --ask-become-pass
 
 run-laptop:
-	ansible-playbook site.yml -i inventory/hosts.yml --limit thinkpad --ask-become-pass
+	ansible-playbook site.yml -i inventory/hosts.yml --limit laptop --ask-become-pass
 
 run-pi:
 	ansible-playbook site.yml -i inventory/hosts.yml --limit raspberrypi --ask-become-pass

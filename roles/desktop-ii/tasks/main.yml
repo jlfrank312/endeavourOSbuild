@@ -78,6 +78,22 @@
   when: has_nvidia_gpu | default(false)
 
 # =============================================================================
+# 3-D. Hyprland Display Configuration (VRR/VFR)
+# =============================================================================
+- name: Deploy Hyprland display configuration
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/hyprland-display.conf.j2"
+    dest: "/home/{{ user_name }}/.config/hypr/custom/display.conf"
+    owner: "{{ user_name }}"
+    mode: '0644'
+
+- name: Ensure hyprland.conf sources display config
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
+    line: "source = ~/.config/hypr/custom/display.conf"
+    state: present
+
+# =============================================================================
 # 4. II-Compat Snapshot
 # =============================================================================
 - name: Snapshot II dependencies for ii-compat fallback
