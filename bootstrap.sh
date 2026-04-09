@@ -41,6 +41,6 @@ ansible-galaxy collection install -r requirements.yml
 # 5. Run the playbook
 echo ":: Running Ansible Playbook ::"
 # --ask-become-pass (-K) prompts for sudo password once at start
-ansible-playbook site.yml -i inventory/ --connection=local --limit tabula
+ansible-playbook site.yml -i inventory/ --connection=local --limit laptop
 
 echo ":: System Bootstrap Complete ::"
