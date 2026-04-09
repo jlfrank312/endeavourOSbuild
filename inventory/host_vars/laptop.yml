@@ -11,13 +11,6 @@ tlp_charge_stop: 80
 # Allow short turbo bursts on battery for responsiveness
 auto_cpufreq_battery_turbo: auto
 
-# Removed, under the presumption that letting  auto-cpufreq and the CPU's hardware P-state driver manage the floor themselves is preferable
-# 400MHz minimum prevents scheduler stutter under light interactive load
-# auto_cpufreq_scaling_min_freq: 400000 
-
-# No frequency cap — let turbo headroom exist when needed
-# auto_cpufreq_scaling_max_freq: not set
-
 # =============================================================================
 # Display (Hyprland)
 # =============================================================================

@@ -1,1 +1,12 @@
-# Currently empty
+# =============================================================================
+# Display (Hyprland)
+# =============================================================================
+hyprland_vfr: 1    # start enabled — disable if brightness flicker observed
+hyprland_vrr: 2    # fullscreen only — safe default for OLED
+
+# =============================================================================
+# Monitor connectors
+# Populate after first boot by running: hyprctl monitors
+# =============================================================================
+# monitor_primary: DP-1       # Alienware OLED ultrawide — confirm connector
+# monitor_secondary: DP-2     # second monitor — confirm connector

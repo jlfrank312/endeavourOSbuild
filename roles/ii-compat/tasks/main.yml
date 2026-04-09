@@ -27,10 +27,6 @@
   register: pacman_result
   failed_when: false
 
-# NOTE: The retry-via-AUR logic below is a placeholder.
-# On first real test run, inspect pacman_result.stderr to identify
-# which packages failed (typically "target not found: <pkg>") and
-# verify the AUR fallback catches them correctly.
 - name: Collect packages not found in official repos
   ansible.builtin.set_fact:
     aur_fallback_packages: >-

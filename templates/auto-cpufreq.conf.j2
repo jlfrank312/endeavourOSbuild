@@ -9,7 +9,9 @@ turbo = auto
 governor = powersave
 energy_performance_preference = balance_power
 turbo = {{ auto_cpufreq_battery_turbo | default('auto') }}
-scaling_min_freq = {{ auto_cpufreq_scaling_min_freq | default('400000') }}
+{% if auto_cpufreq_scaling_min_freq is defined and auto_cpufreq_scaling_min_freq %}
+scaling_min_freq = {{ auto_cpufreq_scaling_min_freq }}
+{% endif %}
 {% if auto_cpufreq_scaling_max_freq is defined and auto_cpufreq_scaling_max_freq %}
 scaling_max_freq = {{ auto_cpufreq_scaling_max_freq }}
 {% endif %}

@@ -13,6 +13,12 @@
     state: present
   become_user: "{{ user_name }}"
 
+- name: Enable and start auto-cpufreq service
+  ansible.builtin.systemd:
+    name: auto-cpufreq
+    enabled: yes
+    state: started
+
 - name: Deploy auto-cpufreq configuration
   ansible.builtin.template:
     src: "{{ playbook_dir }}/templates/auto-cpufreq.conf.j2"
@@ -21,12 +27,6 @@
     group: root
     mode: '0644'
   notify: Restart auto-cpufreq
-
-- name: Enable and start auto-cpufreq service
-  ansible.builtin.systemd:
-    name: auto-cpufreq
-    enabled: yes
-    state: started
 
 # =============================================================================
 # 2. TLP Setup (Battery Management)

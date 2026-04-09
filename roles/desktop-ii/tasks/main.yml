@@ -31,18 +31,30 @@
   when: not ii_firstrun.stat.exists
   tags: [update-ii]
 
-
 # =============================================================================
-# 3. Hyprland Environment Setup (NVidia)
+# 3-I. Hyprland Environment Setup (Intel)
 # =============================================================================
-- name: Ensure hyprland config directory exists
-  ansible.builtin.file:
-    path: "/home/{{ user_name }}/.config/hypr/custom"
-    state: directory
+- name: Deploy Intel Hyprland environment variables
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.config/hypr/custom/intel-env.conf"
     owner: "{{ user_name }}"
-    mode: '0755'
-  when: has_nvidia_gpu | default(false)
+    mode: '0644'
+    content: |
+      # Intel GPU Wayland environment variables
+      # Managed by Ansible - do not edit manually
+      env = LIBVA_DRIVER_NAME,iHD
+  when: has_intel_gpu | default(false)
 
+- name: Ensure hyprland.conf sources Intel env file
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
+    line: "source = ~/.config/hypr/custom/intel-env.conf"
+    state: present
+  when: has_intel_gpu | default(false)
+
+# =============================================================================
+# 3-N. Hyprland Environment Setup (NVidia)
+# =============================================================================
 - name: Deploy NVIDIA Hyprland environment variables
   ansible.builtin.copy:
     dest: "/home/{{ user_name }}/.config/hypr/custom/nvidia-env.conf"
