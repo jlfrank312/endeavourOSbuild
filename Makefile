@@ -1,5 +1,6 @@
+---
 bootstrap:
-	ansible-playbook site.yml -i "localhost," --connection=local --ask-become-pass
+	ansible-playbook site.yml -i inventory/ --connection=local --ask-become-pass
 
 run:
 	ansible-playbook site.yml -i inventory/hosts.yml --ask-become-pass
@@ -19,3 +20,4 @@ snapshot-ii:
 update-ii:
 	ansible-playbook site.yml -i "localhost," --connection=local \
 	  --tags update-ii --ask-become-pass
+	  

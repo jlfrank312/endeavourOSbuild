@@ -11,6 +11,8 @@
   kewlfft.aur.aur:
     name: auto-cpufreq
     state: present
+    use: yay
+    extra_args: "--sudoloop"
   become_user: "{{ user_name }}"
 
 - name: Enable and start auto-cpufreq service
@@ -75,3 +77,4 @@
     name: firewalld
     enabled: yes
     state: started
+    
