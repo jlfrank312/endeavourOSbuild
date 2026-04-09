@@ -1,1 +1,13 @@
-# Currently empty
+---
+- name: Install Intel GPU drivers and media stack
+  ansible.builtin.pacman:
+    name:
+      - mesa                    # Core OpenGL/Vulkan implementation
+      - lib32-mesa              # 32-bit support (Steam, Proton)
+      - vulkan-intel            # Vulkan driver for Intel
+      - lib32-vulkan-intel      # 32-bit Vulkan (Steam, Proton)
+      - intel-media-driver      # VA-API hardware video decode (Broadwell+)
+      - libva-utils             # VA-API diagnostic utilities
+      - intel-gpu-tools         # Intel GPU diagnostics
+    state: present
+    
