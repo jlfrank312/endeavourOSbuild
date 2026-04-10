@@ -69,7 +69,8 @@
          'bmi2'  in (cpuinfo_output.stdout | default('')) and
          'f16c'  in (cpuinfo_output.stdout | default('')) and
          'fma'   in (cpuinfo_output.stdout | default('')) and
-         'lzcnt' in (cpuinfo_output.stdout | default('')) and
+         ('lzcnt' in (cpuinfo_output.stdout | default('')) or
+          'abm'   in (cpuinfo_output.stdout | default(''))) and
          'movbe' in (cpuinfo_output.stdout | default('')) and
          'xsave' in (cpuinfo_output.stdout | default('')) }}
 
@@ -99,3 +100,4 @@
     name: "{{ inventory_hostname }}"
     groups: nvidia_hosts
   when: has_nvidia_gpu | default(false)
+  
