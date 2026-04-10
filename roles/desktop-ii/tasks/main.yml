@@ -21,12 +21,13 @@
   become: false
 
 - name: Run II full installer
-  ansible.builtin.shell: |
-    echo "{{ ansible_become_password }}" | sudo -S -v 2>/dev/null
-    SKIP_ALLGREETING=1 ./setup install --skip-sysupdate --skip-backup -f
-  args:
+  ansible.builtin.expect:
+    command: bash -c "SKIP_ALLGREETING=1 ./setup install --skip-sysupdate --skip-backup -f"
     chdir: "/home/{{ user_name }}/.cache/dots-hyprland"
-    executable: /bin/bash
+    responses:
+      '(?i)\[sudo\] password for {{ user_name }}': "{{ ansible_become_password }}"
+      '(?i)password': "{{ ansible_become_password }}"
+    timeout: 3600
   become: false
   changed_when: true
   when: not ii_firstrun.stat.exists

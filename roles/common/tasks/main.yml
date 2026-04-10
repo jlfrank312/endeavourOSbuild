@@ -47,6 +47,7 @@
       - rsync
       - avahi
       - nss-mdns
+      - python-pexpect
     state: present
     update_cache: false
 

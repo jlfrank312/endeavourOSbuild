@@ -7,18 +7,15 @@
     name: python-typing_extensions
     state: present
 
-- name: Prime sudo credentials for AUR builds
-  ansible.builtin.shell: |
-    echo "{{ ansible_become_password }}" | sudo -S -v 2>/dev/null
-  changed_when: false
-
 - name: Install auto-cpufreq from AUR
-  kewlfft.aur.aur:
-    name: auto-cpufreq
-    state: present
-    use: yay
-    extra_args: "--sudoloop"
+  ansible.builtin.expect:
+    command: yay -S auto-cpufreq --sudoloop --noconfirm --needed
+    responses:
+      '(?i)\[sudo\] password for {{ user_name }}': "{{ ansible_become_password }}"
+      '(?i)password': "{{ ansible_become_password }}"
+    timeout: 1800
   become_user: "{{ user_name }}"
+  become: true
 
 - name: Enable and start auto-cpufreq service
   ansible.builtin.systemd:
@@ -87,4 +84,3 @@
     name: firewalld
     enabled: yes
     state: started
-    
