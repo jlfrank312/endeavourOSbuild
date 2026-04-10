@@ -43,6 +43,11 @@
     name: tlp
     state: present
 
+- name: Mask power-profiles-daemon to prevent TLP conflict
+  ansible.builtin.systemd:
+    name: power-profiles-daemon
+    masked: yes
+
 - name: Mask tlp-sleep service to prevent auto-cpufreq conflicts
   ansible.builtin.systemd:
     name: tlp-sleep.service
