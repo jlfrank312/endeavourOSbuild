@@ -80,6 +80,27 @@
   when: has_nvidia_gpu | default(false)
 
 # =============================================================================
+# 3-L. Hyprland Environment Setup (Laptop)
+# =============================================================================
+
+- name: Deploy laptop input configuration
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/.config/hypr/custom/input.conf"
+    dest: "/home/{{ user_name }}/.config/hypr/custom/input.conf"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  when:
+    - is_laptop | default(false)
+    - lookup('fileglob', playbook_dir + '/dotfiles/' + ansible_facts['hostname'] + '/.config/hypr/custom/input.conf') | length > 0
+
+- name: Ensure hyprland.conf sources input config
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
+    line: "source = ~/.config/hypr/custom/input.conf"
+    state: present
+  when: is_laptop | default(false)
+
+# =============================================================================
 # 3-D. Hyprland Display Configuration (VRR/VFR)
 # =============================================================================
 - name: Deploy Hyprland display configuration
