@@ -117,6 +117,27 @@
     state: present
 
 # =============================================================================
+# 3-W. Wallpaper Deployment
+# =============================================================================
+- name: Find wallpaper file
+  ansible.builtin.set_fact:
+    wallpaper_src: "{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts['hostname'] + '/wallpaper.*') | first }}"
+
+- name: Ensure wallpaper directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/Pictures/Wallpapers"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+
+- name: Deploy wallpaper
+  ansible.builtin.copy:
+    src: "{{ wallpaper_src }}"
+    dest: "/home/{{ user_name }}/Pictures/Wallpapers/{{ wallpaper_src | basename }}"
+    owner: "{{ user_name }}"
+    mode: '0644'
+
+# =============================================================================
 # 4. II-Compat Snapshot
 # =============================================================================
 - name: Snapshot II dependencies for ii-compat fallback
