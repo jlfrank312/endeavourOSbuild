@@ -3,7 +3,7 @@
 # EndeavourOS post-install commands for endeavourOSbuild
 # Clones the Ansible repo and sets up prerequisites for bootstrap.sh
 # Vault password must be placed at /home/liveuser/vault-password before install,
-# or set manually after first boot using the set-vault-password helper function.
+# or set manually after first boot using ~/setup/set-vault-password.sh
 #----------------------------------------------------------------------------------
 
 _PostInstallCommands() {
@@ -29,34 +29,18 @@ _PostInstallCommands() {
     # Set ownership of the cloned repo
     chown -R "$username:$username" "$repo_dir"
 
-    # Copy vault password from live USB if present
+    # Copy vault password from live USB if present, otherwise stage helper script
+    mkdir -p "$home_dir/setup"
     if [ -f /home/liveuser/vault-password ]; then
-        mkdir -p "$home_dir/setup"
         cp /home/liveuser/vault-password "$home_dir/setup/vault-password"
         chmod 600 "$home_dir/setup/vault-password"
-        chown "$username:$username" "$home_dir/setup/vault-password"
-        chown "$username:$username" "$home_dir/setup"
     else
         echo "WARNING: vault-password not found at /home/liveuser/vault-password"
-        echo "Use the set-vault-password helper function after first boot."
-
-        # Add one-time helper function to .bashrc
-
-cat >> "$home_dir/.bashrc" << 'EOF'
-
-# BEGIN set-vault-password
-set-vault-password() {
-    mkdir -p ~/setup
-    printf "$1" > ~/setup/vault-password
-    chmod 600 ~/setup/vault-password
-    sed -i '/# BEGIN set-vault-password/,/# END set-vault-password/d' ~/.bashrc
-    sed -i '/# END set-vault-password/d' ~/.bashrc
-    echo "Vault password set. Helper function removed."
-}
-# END set-vault-password
-EOF
-        chown "$username:$username" "$home_dir/.bashrc"
+        echo "After first boot run: ~/setup/set-vault-password.sh <password>"
+        cp "$repo_dir/eos-install/set-vault-password.sh" "$home_dir/setup/set-vault-password.sh"
+        chmod +x "$home_dir/setup/set-vault-password.sh"
     fi
+    chown -R "$username:$username" "$home_dir/setup"
 }
 
 case "$1" in
