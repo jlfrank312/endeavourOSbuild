@@ -119,6 +119,14 @@
 # =============================================================================
 # 3-W. Wallpaper Deployment
 # =============================================================================
+- name: Debug hostname resolution
+  ansible.builtin.debug:
+    msg:
+      - "ansible_facts.hostname = '{{ ansible_facts.hostname | default('UNDEFINED') }}'"
+      - "ansible_facts['hostname'] = '{{ ansible_facts['hostname'] | default('UNDEFINED') }}'"
+      - "inventory_hostname = '{{ inventory_hostname }}'"
+      - "glob path = '{{ playbook_dir + '/dotfiles/wallpapers/' + (ansible_facts.hostname | default('MISSING')) + '/wallpaper.*' }}'"
+
 - name: Find wallpaper file
   ansible.builtin.set_fact:
     wallpaper_src: "{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts.hostname + '/wallpaper.*') | first }}"
