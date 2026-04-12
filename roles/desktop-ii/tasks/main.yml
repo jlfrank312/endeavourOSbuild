@@ -134,6 +134,15 @@
     mode: '0644'
 
 # =============================================================================
+# 3-C. Misc Config Deployments
+# =============================================================================
+- name: Ensure kitty.conf includes user config
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/kitty/kitty.conf"
+    line: "include ~/.config/kitty/user.conf"
+    state: present
+
+# =============================================================================
 # 4. II-Compat Snapshot
 # =============================================================================
 - name: Snapshot II dependencies for ii-compat fallback
