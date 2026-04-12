@@ -41,16 +41,18 @@ _PostInstallCommands() {
         echo "Use the set-vault-password helper function after first boot."
 
         # Add one-time helper function to .bashrc
-        cat >> "$home_dir/.bashrc" << 'EOF'
 
-# One-time helper — removes itself after use
+cat >> "$home_dir/.bashrc" << 'EOF'
+
+# BEGIN set-vault-password
 set-vault-password() {
     mkdir -p ~/setup
     printf "$1" > ~/setup/vault-password
     chmod 600 ~/setup/vault-password
-    sed -i '/set-vault-password/d' ~/.bashrc
+    sed -i '/# BEGIN set-vault-password/,/# END set-vault-password/d' ~/.bashrc
     echo "Vault password set. Helper function removed."
 }
+# END set-vault-password
 EOF
         chown "$username:$username" "$home_dir/.bashrc"
     fi
