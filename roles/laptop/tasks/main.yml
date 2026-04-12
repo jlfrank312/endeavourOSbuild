@@ -84,3 +84,21 @@
     name: firewalld
     enabled: yes
     state: started
+
+# =============================================================================
+# 4. GNOME Keyring (Auto-unlock on TTY login)
+# =============================================================================
+- name: Install GNOME keyring
+  ansible.builtin.pacman:
+    name:
+      - gnome-keyring
+      - gcr
+    state: present
+
+- name: Configure PAM to auto-unlock keyring on login
+  ansible.builtin.blockinfile:
+    path: /etc/pam.d/login
+    marker: "# {mark} ANSIBLE MANAGED - gnome-keyring"
+    block: |
+      auth     optional  pam_gnome_keyring.so
+      session  optional  pam_gnome_keyring.so auto_start
