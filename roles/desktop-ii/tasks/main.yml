@@ -119,22 +119,6 @@
 # =============================================================================
 # 3-W. Wallpaper Deployment
 # =============================================================================
-- name: Debug hostname resolution
-  ansible.builtin.debug:
-    msg:
-      - "ansible_facts.hostname = '{{ ansible_facts.hostname | default('UNDEFINED') }}'"
-      - "ansible_facts['hostname'] = '{{ ansible_facts['hostname'] | default('UNDEFINED') }}'"
-      - "inventory_hostname = '{{ inventory_hostname }}'"
-      - "glob path = '{{ playbook_dir + '/dotfiles/wallpapers/' + (ansible_facts.hostname | default('MISSING')) + '/wallpaper.*' }}'"
-
-- name: Debug fileglob raw result
-  ansible.builtin.debug:
-    msg: "raw fileglob = '{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts.hostname + '/wallpaper.*') }}'"
-
-- name: Find wallpaper file
-  ansible.builtin.set_fact:
-    wallpaper_src: "{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts.hostname + '/wallpaper.*') | first }}"
-
 - name: Ensure wallpaper directory exists
   ansible.builtin.file:
     path: "/home/{{ user_name }}/Pictures/Wallpapers"
@@ -142,10 +126,10 @@
     owner: "{{ user_name }}"
     mode: '0755'
 
-- name: Deploy wallpaper
+- name: Deploy wallpapers
   ansible.builtin.copy:
-    src: "{{ wallpaper_src }}"
-    dest: "/home/{{ user_name }}/Pictures/Wallpapers/{{ wallpaper_src | basename }}"
+    src: "{{ playbook_dir }}/dotfiles/wallpapers/{{ ansible_facts.hostname }}/"
+    dest: "/home/{{ user_name }}/Pictures/Wallpapers/"
     owner: "{{ user_name }}"
     mode: '0644'
 
