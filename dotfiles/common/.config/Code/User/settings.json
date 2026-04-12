@@ -1,0 +1,16 @@
+{
+    "git.autofetch": true,
+    "ansible.validation.lint.path": "/usr/bin/ansible-lint",
+    "ansible.validation.lint.enabled": true,
+    "files.associations": {
+        "*.yml": "ansible",
+        "*.yaml": "ansible"
+    },
+    "redhat.telemetry.enabled": false,
+    "window.titleBarStyle": "custom",
+    "[ansible]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+    },
+    "shellcheck.executablePath": "/usr/bin/shellcheck"
+}
