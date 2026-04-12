@@ -121,7 +121,7 @@
 # =============================================================================
 - name: Find wallpaper file
   ansible.builtin.set_fact:
-    wallpaper_src: "{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts['hostname'] + '/wallpaper.*') | first }}"
+    wallpaper_src: "{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts.hostname + '/wallpaper.*') | first }}"
 
 - name: Ensure wallpaper directory exists
   ansible.builtin.file:
