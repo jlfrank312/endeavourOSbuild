@@ -127,6 +127,10 @@
       - "inventory_hostname = '{{ inventory_hostname }}'"
       - "glob path = '{{ playbook_dir + '/dotfiles/wallpapers/' + (ansible_facts.hostname | default('MISSING')) + '/wallpaper.*' }}'"
 
+- name: Debug fileglob raw result
+  ansible.builtin.debug:
+    msg: "raw fileglob = '{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts.hostname + '/wallpaper.*') }}'"
+
 - name: Find wallpaper file
   ansible.builtin.set_fact:
     wallpaper_src: "{{ lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts.hostname + '/wallpaper.*') | first }}"
