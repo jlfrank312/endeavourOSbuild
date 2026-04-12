@@ -50,6 +50,7 @@ set-vault-password() {
     printf "$1" > ~/setup/vault-password
     chmod 600 ~/setup/vault-password
     sed -i '/# BEGIN set-vault-password/,/# END set-vault-password/d' ~/.bashrc
+    sed -i '/# END set-vault-password/d' ~/.bashrc
     echo "Vault password set. Helper function removed."
 }
 # END set-vault-password
