@@ -51,3 +51,27 @@
     - { regexp: '^TIMELINE_LIMIT_HOURLY=.*', line: 'TIMELINE_LIMIT_HOURLY="5"' }
     - { regexp: '^TIMELINE_LIMIT_DAILY=.*', line: 'TIMELINE_LIMIT_DAILY="7"' }
   when: root_fstype == 'btrfs'
+
+# --- Update GRUB if there is a new CachyOS Kernel ---
+
+- name: Set GRUB_DEFAULT to saved
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^GRUB_DEFAULT='
+    line: 'GRUB_DEFAULT=saved'
+  when: is_x86 | default(false)
+
+- name: Get root partition UUID
+  ansible.builtin.command: findmnt -n -o UUID /
+  register: root_uuid
+  changed_when: false
+  when: is_x86 | default(false)
+
+- name: Set CachyOS kernel as GRUB default
+  ansible.builtin.command: >
+    grub-set-default
+    'gnulinux-advanced-{{ root_uuid.stdout | trim }}>gnulinux-linux-cachyos-advanced-{{ root_uuid.stdout | trim }}'
+  changed_when: true
+  when: 
+    - is_x86 | default(false)
+    - supports_x86_64_v3 | default(false)
