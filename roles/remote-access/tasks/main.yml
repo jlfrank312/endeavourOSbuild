@@ -1,1 +1,39 @@
-# Currently empty
+---
+# =============================================================================
+# 1. FreeRDP
+# =============================================================================
+- name: Install FreeRDP
+  ansible.builtin.pacman:
+    name: freerdp
+    state: present
+  when: is_laptop | default(false) or is_desktop | default(false)
+
+# =============================================================================
+# 2. Work PC RDP Connection
+# =============================================================================
+- name: Ensure FreeRDP config directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.config/freerdp"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0700'
+  when: is_laptop | default(false)
+
+- name: Deploy work PC RDP file
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.config/freerdp/workpc.rdp"
+    content: "{{ workpc_rdp }}"
+    owner: "{{ user_name }}"
+    mode: '0600'
+  when: is_laptop | default(false)
+
+- name: Deploy work PC connection script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.config/freerdp/workpc.sh"
+    owner: "{{ user_name }}"
+    mode: '0700'
+    content: |
+      #!/bin/bash
+      USERNAME=$(grep "^username:s:" ~/.config/freerdp/workpc.rdp | cut -d: -f3)
+      xfreerdp3 ~/.config/freerdp/workpc.rdp /u:"$USERNAME" /d:""
+  when: is_laptop | default(false)
