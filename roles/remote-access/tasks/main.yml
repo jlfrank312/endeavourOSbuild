@@ -3,7 +3,7 @@
 # 1. FreeRDP
 # =============================================================================
 - name: Install FreeRDP
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: freerdp
     state: present
   when: is_laptop | default(false) or is_desktop | default(false)
@@ -45,5 +45,92 @@
     mode: '0700'
     content: |
       #!/bin/bash
-      xfreerdp3 /v:10.0.0.170 /u:{{ user_name }} /d:"" /f
+      xfreerdp3 /v:{{ mainpc_smb_host }} /u:{{ mainpc_smb_user }} /d:"" /f
+  when: is_laptop | default(false)
+
+# =============================================================================
+# 3. Main PC SMB Shares
+# =============================================================================
+- name: Install cifs-utils
+  community.general.pacman:
+    name: cifs-utils
+    state: present
+  when: is_laptop | default(false)
+
+- name: Ensure samba config directory exists
+  ansible.builtin.file:
+    path: /etc/samba
+    state: directory
+    owner: root
+    mode: '0755'
+  when: is_laptop | default(false)
+
+- name: Deploy SMB credentials file
+  ansible.builtin.copy:
+    dest: "/etc/samba/mainpc.creds"
+    content: |
+      username={{ mainpc_smb_user }}
+      password={{ mainpc_smb_password }}
+    owner: root
+    group: root
+    mode: '0600'
+  when: is_laptop | default(false)
+
+- name: Create mount point directories
+  ansible.builtin.file:
+    path: "/mnt/mainpc/{{ item | lower }}"
+    state: directory
+    owner: root
+    mode: '0755'
+  loop: "{{ mainpc_smb_shares }}"
+  when: is_laptop | default(false)
+
+- name: Deploy systemd mount units
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-mainpc-{{ item | lower }}.mount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount Main PC {{ item }} drive
+      After=network-online.target
+      Wants=network-online.target
+
+      [Mount]
+      What=//{{ mainpc_smb_host }}/{{ item }}
+      Where=/mnt/mainpc/{{ item | lower }}
+      Type=cifs
+      Options=credentials=/etc/samba/mainpc.creds,uid={{ user_name }},gid={{ user_name }},iocharset=utf8,vers=3.0
+
+      [Install]
+      WantedBy=multi-user.target
+  loop: "{{ mainpc_smb_shares }}"
+  when: is_laptop | default(false)
+
+- name: Deploy systemd automount units
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-mainpc-{{ item | lower }}.automount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Automount Main PC {{ item }} drive
+      After=network-online.target
+
+      [Automount]
+      Where=/mnt/mainpc/{{ item | lower }}
+      TimeoutIdleSec=300
+
+      [Install]
+      WantedBy=multi-user.target
+  loop: "{{ mainpc_smb_shares }}"
+  when: is_laptop | default(false)
+
+- name: Enable and start automount units
+  ansible.builtin.systemd:
+    name: "mnt-mainpc-{{ item | lower }}.automount"
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  loop: "{{ mainpc_smb_shares }}"
   when: is_laptop | default(false)
