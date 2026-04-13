@@ -20,7 +20,7 @@ mainpc_smb_password: "{{ vault_mainpc_smb_password }}"
 
 mainpc_smb_shares: "{{ vault_mainpc_smb_shares }}"
 
-ssh_private_key: "{{ vars['vault_' + ansible_facts['hostname'] + '_ssh_private_key'] }}"
+ssh_private_key: "{{ lookup('vars', 'vault_' + ansible_facts['hostname'] + '_ssh_private_key') }}"
 
 seedbox_host: "{{ vault_seedbox_host }}"
 
