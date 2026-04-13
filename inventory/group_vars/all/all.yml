@@ -11,3 +11,11 @@ timezone: "America/Los_Angeles"
 ansible_become_password: "{{ vault_become_password }}"
 
 workpc_rdp: "{{ vault_workpc_rdp }}"
+
+mainpc_smb_host: "{{ vault_mainpc_smb_host }}"
+
+mainpc_smb_user: "{{ vault_mainpc_smb_user }}"
+
+mainpc_smb_password: "{{ vault_mainpc_smb_password }}"
+
+mainpc_smb_shares: "{{ vault_mainpc_smb_shares }}"
