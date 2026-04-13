@@ -47,3 +47,21 @@
       #!/bin/bash
       xfreerdp3 /v:10.0.0.170 /u:{{ user_name }} /d:"" /f
   when: is_laptop | default(false)
+
+- name: Add workpc alias to Fish config
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/fish/config.fish"
+    line: "alias workpc '~/.config/freerdp/workpc.sh'"
+    state: present
+  become: false
+  become_user: "{{ user_name }}"
+  when: is_laptop | default(false)
+
+- name: Add mainpc alias to Fish config
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/fish/config.fish"
+    line: "alias mainpc '~/.config/freerdp/mainpc.sh'"
+    state: present
+  become: false
+  become_user: "{{ user_name }}"
+  when: is_laptop | default(false)
