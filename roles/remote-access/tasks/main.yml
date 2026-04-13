@@ -9,8 +9,15 @@
   when: is_laptop | default(false) or is_desktop | default(false)
 
 # =============================================================================
-# 2. Work PC RDP Connection
+# 2. Remote Connection Scripts
 # =============================================================================
+- name: Ensure ~/.local/bin directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.local/bin"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+
 - name: Ensure FreeRDP config directory exists
   ansible.builtin.file:
     path: "/home/{{ user_name }}/.config/freerdp"
@@ -29,7 +36,7 @@
 
 - name: Deploy work PC connection script
   ansible.builtin.copy:
-    dest: "/home/{{ user_name }}/.config/freerdp/workpc.sh"
+    dest: "/home/{{ user_name }}/.local/bin/workpc"
     owner: "{{ user_name }}"
     mode: '0700'
     content: |
@@ -40,7 +47,7 @@
 
 - name: Deploy main PC connection script
   ansible.builtin.copy:
-    dest: "/home/{{ user_name }}/.config/freerdp/mainpc.sh"
+    dest: "/home/{{ user_name }}/.local/bin/mainpc"
     owner: "{{ user_name }}"
     mode: '0700'
     content: |
@@ -134,3 +141,117 @@
     daemon_reload: yes
   loop: "{{ mainpc_smb_shares }}"
   when: is_laptop | default(false)
+
+# =============================================================================
+# 4. Seedbox SSH Key & SSHFS Mount
+# =============================================================================
+- name: Ensure .ssh directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.ssh"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0700'
+  become: false
+
+- name: Deploy SSH private key
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.ssh/id_ed25519"
+    content: "{{ ssh_private_key }}"
+    owner: "{{ user_name }}"
+    mode: '0600'
+  become: false
+
+- name: Deploy SSH public key
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.ssh/id_ed25519.pub"
+    src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/.ssh/id_ed25519.pub"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  become: false
+
+- name: Install sshfs
+  ansible.builtin.pacman:
+    name: sshfs
+    state: present
+
+- name: Create seedbox mount point
+  ansible.builtin.file:
+    path: /mnt/{{ seedbox_name }}
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+
+- name: Deploy seedbox SSH config
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    content: |
+      Host {{ seedbox_name }}
+          HostName {{ seedbox_host }}
+          User {{ seedbox_user }}
+          IdentityFile ~/.ssh/id_ed25519
+  become: false
+
+- name: Deploy seedbox connection script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.local/bin/{{ seedbox_name }}"
+    owner: "{{ user_name }}"
+    mode: '0700'
+    content: |
+      #!/bin/bash
+      ssh {{ seedbox_user }}@{{ seedbox_host }}
+  become: false
+
+- name: Get user UID and GID
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ user_name }}"
+
+- name: Deploy systemd mount unit for seedbox
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-{{ seedbox_name }}.mount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount Seedbox
+      After=network-online.target
+      Wants=network-online.target
+
+      [Mount]
+      What={{ seedbox_user }}@{{ seedbox_host }}:
+      Where=/mnt/{{ seedbox_name }}
+      Type=fuse.sshfs
+      Options=identityfile=/home/{{ user_name }}/.ssh/id_ed25519,\
+        allow_other,\
+        default_permissions,\
+        uid={{ ansible_facts.getent_passwd[user_name][1] }},\
+        gid={{ ansible_facts.getent_passwd[user_name][2] }}
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Deploy systemd automount unit for seedbox
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-{{ seedbox_name }}.automount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Automount Seedbox
+      After=network-online.target
+
+      [Automount]
+      Where=/mnt/{{ seedbox_name }}
+      TimeoutIdleSec=300
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start seedbox automount
+  ansible.builtin.systemd:
+    name: mnt-{{ seedbox_name }}.automount
+    enabled: yes
+    state: started
+    daemon_reload: yes
