@@ -37,3 +37,13 @@
       USERNAME=$(grep "^username:s:" ~/.config/freerdp/workpc.rdp | cut -d: -f3)
       xfreerdp3 ~/.config/freerdp/workpc.rdp /u:"$USERNAME" /d:""
   when: is_laptop | default(false)
+
+- name: Deploy main PC connection script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.config/freerdp/mainpc.sh"
+    owner: "{{ user_name }}"
+    mode: '0700'
+    content: |
+      #!/bin/bash
+      xfreerdp3 /v:10.0.0.170 /u:{{ user_name }} /d:"" /f
+  when: is_laptop | default(false)
