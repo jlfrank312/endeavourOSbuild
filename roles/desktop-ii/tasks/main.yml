@@ -150,6 +150,72 @@
   when: is_laptop | default(false)
 
 # =============================================================================
+# 3-P. Deploy Display Color Profile
+# =============================================================================
+- name: Install xiccd for Wayland ICC profile support
+  ansible.builtin.pacman:
+    name:
+      - xiccd
+      - colord
+    state: present
+
+- name: Enable colord service
+  ansible.builtin.systemd:
+    name: colord
+    enabled: yes
+    state: started
+
+- name: Copy ICC profiles to colord directory
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/dotfiles/tabula/display_profiles/{{ item }}"
+    dest: "/usr/share/color/icc/colord/{{ item }}"
+    owner: root
+    mode: '0644'
+  loop:
+    - gaming.icc
+    - health.icc
+    - office.icc
+  become: true
+  when: is_laptop | default(false)
+
+- name: Start xiccd and assign gaming profile to display
+  ansible.builtin.shell: |
+    xiccd &
+    sleep 2
+    colormgr device-add-profile xrandr-eDP-1 icc-74249ceae37cdad58cc5066c2234be54
+    colormgr device-make-profile-default xrandr-eDP-1 icc-74249ceae37cdad58cc5066c2234be54
+  become: false
+  changed_when: true
+  when: is_laptop | default(false)
+
+# =============================================================================
+# 3-P-F. Firefox Color Management
+# =============================================================================
+- name: Find Firefox profile directory
+  ansible.builtin.find:
+    paths: "/home/{{ user_name }}/.config/mozilla/firefox"
+    patterns: "*.default-release"
+    file_type: directory
+  register: firefox_profile_dir
+  become: false
+  when: is_laptop | default(false)
+
+- name: Deploy Firefox user.js
+  ansible.builtin.copy:
+    dest: "{{ item.path }}/user.js"
+    owner: "{{ user_name }}"
+    mode: '0644'
+    content: |
+      // Color management
+      user_pref("gfx.color_management.mode", 1);
+      user_pref("gfx.color_management.enablev4", true);
+  loop: "{{ firefox_profile_dir.files }}"
+  become: false
+  when:
+    - is_laptop | default(false)
+    - firefox_profile_dir.files | length > 0
+
+# =============================================================================
 # 4. II-Compat Snapshot
 # =============================================================================
 - name: Snapshot II dependencies for ii-compat fallback
