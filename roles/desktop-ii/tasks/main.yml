@@ -142,6 +142,13 @@
     line: "include ~/.config/kitty/user.conf"
     state: present
 
+- name: Ensure Fish config sources user.fish
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/fish/config.fish"
+    line: "    source ~/.config/fish/user.fish"
+    state: present
+  become: false
+
 - name: Set default gamma in II Hyprsunset service (laptop)
   ansible.builtin.lineinfile:
     path: "/home/{{ user_name }}/.config/quickshell/ii/services/Hyprsunset.qml"
