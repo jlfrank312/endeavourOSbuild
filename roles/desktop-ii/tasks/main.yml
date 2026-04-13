@@ -142,6 +142,13 @@
     line: "include ~/.config/kitty/user.conf"
     state: present
 
+- name: Set default gamma in II Hyprsunset service (laptop)
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/quickshell/ii/services/Hyprsunset.qml"
+    regexp: '^\s*property int gamma: \d+'
+    line: '    property int gamma: 95'
+  when: is_laptop | default(false)
+
 # =============================================================================
 # 4. II-Compat Snapshot
 # =============================================================================
