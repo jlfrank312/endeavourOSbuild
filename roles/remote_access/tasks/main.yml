@@ -223,7 +223,7 @@
       What={{ seedbox_user }}@{{ seedbox_host }}:
       Where=/mnt/{{ seedbox_name }}
       Type=fuse.sshfs
-      Options=identityfile=/home/{{ user_name }}/.ssh/id_ed25519,allow_other,default_permissions,uid={{ ansible_facts.getent_passwd[user_name][1] }},gid={{ ansible_facts.getent_passwd[user_name][2] }}
+      Options=identityfile=/home/{{ user_name }}/.ssh/id_ed25519,allow_other,default_permissions,uid={{ ansible_facts['getent_passwd'][user_name][1] }},gid={{ ansible_facts['getent_passwd'][user_name][2] }}
 
       [Install]
       WantedBy=multi-user.target

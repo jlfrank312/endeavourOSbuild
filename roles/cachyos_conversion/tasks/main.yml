@@ -107,7 +107,7 @@
 - name: Set CachyOS kernel as GRUB default
   ansible.builtin.command: >
     grub-set-default
-    'gnulinux-advanced-{{ cachyos_conversion_root_uuid.stdout | trim }}>gnulinux-linux-cachyos-advanced-{{ root_uuid.stdout | trim }}'
+    'gnulinux-advanced-{{ cachyos_conversion_root_uuid.stdout | trim }}>gnulinux-linux-cachyos-advanced-{{ cachyos_conversion_root_uuid.stdout | trim }}'
   changed_when: true
   when:
     - global_is_x86 | default(false)
