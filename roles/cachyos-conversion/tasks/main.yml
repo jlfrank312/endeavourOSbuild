@@ -3,15 +3,15 @@
 
 - name: Upgrade Pacman Cache to Current
   community.general.pacman:
-    update_cache: yes
-    upgrade: yes
+    update_cache: true
+    upgrade: true
 
 # --- Add CachyOS Repo Keys ---
 
 - name: Import CachyOS GPG Key
   ansible.builtin.command: pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
 
-- name: Locally Sign CachyOS GPG Key
+- name: Locally Sign CachyOS GPG Keyyes
   ansible.builtin.command: pacman-key --lsign-key F3B607488DB35A47
 
 # --- Preparation to Convert to CachyOS Repo Mirrors ---
@@ -57,7 +57,7 @@
       - cachyos-keyring
       - cachyos-mirrorlist
       - cachyos-v3-mirrorlist
-    update_cache: yes
+    update_cache: true
     state: present
   register: cachyos_lists
 
@@ -82,15 +82,15 @@
     name:
       - linux-cachyos
       - linux-cachyos-headers
-    update_cache: yes
+    update_cache: true
     state: present
 
 # --- Final Convergence of Pacman Cache ---
 
 - name: Upgrade Pacman Cache to Current
   community.general.pacman:
-    update_cache: yes
-    upgrade: yes
+    update_cache: true
+    upgrade: true
 
 # --- Configure GRUB to boot using CachyOS kernel ---
 
