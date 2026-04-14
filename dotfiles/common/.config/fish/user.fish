@@ -1,2 +1,1 @@
-alias workpc '~/.config/freerdp/workpc.sh'
-alias mainpc '~/.config/freerdp/mainpc.sh'
+fish_add_path ~/.local/bin
