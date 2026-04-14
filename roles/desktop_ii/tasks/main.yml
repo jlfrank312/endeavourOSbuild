@@ -17,7 +17,7 @@
 - name: Check if II has been previously installed
   ansible.builtin.stat:
     path: "/home/{{ user_name }}/.config/illogical-impulse/installed_true"
-  register: ii_firstrun
+  register: desktop_ii_firstrun
   become: false
 
 - name: Run II full installer
@@ -30,7 +30,7 @@
     timeout: 3600
   become: false
   changed_when: true
-  when: not ii_firstrun.stat.exists
+  when: not desktop_ii_firstrun.stat.exists
   tags: [update-ii]
 
 # =============================================================================
@@ -45,14 +45,14 @@
       # Intel GPU Wayland environment variables
       # Managed by Ansible - do not edit manually
       env = LIBVA_DRIVER_NAME,iHD
-  when: has_intel_gpu | default(false)
+  when: global_has_intel_gpu | default(false)
 
 - name: Ensure hyprland.conf sources Intel env file
   ansible.builtin.lineinfile:
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/custom/intel-env.conf"
     state: present
-  when: has_intel_gpu | default(false)
+  when: global_has_intel_gpu | default(false)
 
 # =============================================================================
 # 3-N. Hyprland Environment Setup (NVidia)
@@ -70,14 +70,14 @@
       env = GBM_BACKEND,nvidia-drm
       env = __GLX_VENDOR_LIBRARY_NAME,nvidia
       env = NVD_BACKEND,direct
-  when: has_nvidia_gpu | default(false)
+  when: global_has_nvidia_gpu | default(false)
 
 - name: Ensure hyprland.conf sources NVIDIA env file
   ansible.builtin.lineinfile:
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/custom/nvidia-env.conf"
     state: present
-  when: has_nvidia_gpu | default(false)
+  when: global_has_nvidia_gpu | default(false)
 
 # =============================================================================
 # 3-L. Hyprland Environment Setup (Laptop)
@@ -90,7 +90,7 @@
     owner: "{{ user_name }}"
     mode: '0644'
   when:
-    - is_laptop | default(false)
+    - global_is_laptop | default(false)
     - lookup('fileglob', playbook_dir + '/dotfiles/' + ansible_facts['hostname'] + '/.config/hypr/custom/input.conf') | length > 0
 
 - name: Ensure hyprland.conf sources input config
@@ -98,7 +98,7 @@
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/custom/input.conf"
     state: present
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 # =============================================================================
 # 3-D. Hyprland Display Configuration (VRR/VFR)
@@ -156,7 +156,7 @@
     path: "/home/{{ user_name }}/.config/quickshell/ii/services/Hyprsunset.qml"
     regexp: '^\s*property int gamma: \d+'
     line: '    property int gamma: 95'
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 # =============================================================================
 # 3-P. Deploy Display Color Profile
@@ -176,7 +176,7 @@
 
 - name: Copy ICC profiles to colord directory
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts.hostname }}/display_profiles/{{ item }}"
+    src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/display_profiles/{{ item }}"
     dest: "/usr/share/color/icc/colord/{{ item }}"
     owner: root
     mode: '0644'
@@ -185,7 +185,7 @@
     - health.icc
     - office.icc
   become: true
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 - name: Start xiccd and assign gaming profile to display
   ansible.builtin.shell: |
@@ -195,7 +195,7 @@
     colormgr device-make-profile-default xrandr-eDP-1 icc-74249ceae37cdad58cc5066c2234be54
   become: false
   changed_when: true
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 # =============================================================================
 # 3-P-F. Firefox Color Management
@@ -205,29 +205,23 @@
     paths: "/home/{{ user_name }}/.config/mozilla/firefox"
     patterns: "*.default-release"
     file_type: directory
-  register: firefox_profile_dir
+  register: desktop_ii_firefox_profile_dir
   become: false
-  when: is_laptop | default(false)
 
 - name: Deploy Firefox user.js
   ansible.builtin.copy:
+    src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/firefox/user.js"
     dest: "{{ item.path }}/user.js"
     owner: "{{ user_name }}"
     mode: '0644'
-    content: |
-      // Color management
-      user_pref("gfx.color_management.mode", 1);
-      user_pref("gfx.color_management.enablev4", true);
-  loop: "{{ firefox_profile_dir.files }}"
+  loop: "{{ desktop_ii_firefox_profile_dir.files | default([]) }}"
   become: false
-  when:
-    - is_laptop | default(false)
-    - firefox_profile_dir.files | length > 0
+  when: desktop_ii_firefox_profile_dir.files | default([]) | length > 0
 
 # =============================================================================
 # 4. II-Compat Snapshot
 # =============================================================================
-- name: Snapshot II dependencies for ii-compat fallback
+- name: Snapshot II dependencies for ii_compat fallback
   ansible.builtin.shell: |
     pacman -Qq | grep '^illogical-impulse-' | xargs pacman -Qi \
     | grep "^Depends On" \
@@ -236,7 +230,7 @@
     | grep -v '^None$\|^$' \
     | sed 's/[>=<].*//' \
     | sort -u
-  register: ii_snapshot_raw
+  register: desktop_ii_snapshot_raw
   changed_when: false
   tags: [snapshot-ii]
   when: "'snapshot-ii' in ansible_run_tags"
@@ -244,13 +238,13 @@
 
 - name: Write II dependency snapshot to ii-compat vars
   ansible.builtin.copy:
-    dest: "{{ playbook_dir }}/roles/ii-compat/vars/snapshot.yml"
+    dest: "{{ playbook_dir }}/roles/ii_compat/vars/snapshot.yml"
     content: |
-      # Auto-generated by desktop-ii role after verified II install
+      # Auto-generated by desktop_ii role after verified II install
       # Do not edit manually — regenerate with: make snapshot-ii
       # Last generated: {{ ansible_date_time.iso8601 }}
       ii_compat_packages:
-      {% for pkg in ii_snapshot_raw.stdout_lines %}
+      {% for pkg in desktop_ii_snapshot_raw.stdout_lines %}
         - {{ pkg }}
       {% endfor %}
   delegate_to: localhost

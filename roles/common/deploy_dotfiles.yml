@@ -5,12 +5,12 @@
 - name: Check if host-specific dotfiles directory exists
   ansible.builtin.stat:
     path: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}"
-  register: host_dotfiles_dir
+  register: common_host_dotfiles_dir
   delegate_to: localhost
   become: false
 
-# NOTE: The filetree lookup plugin returns items with state 'file', 'directory', 
-# or 'link'. Symlinks are intentionally omitted from these tasks to enforce 
+# NOTE: The filetree lookup plugin returns items with state 'file', 'directory',
+# or 'link'. Symlinks are intentionally omitted from these tasks to enforce
 # explicit copying and templating of regular files.
 
 # =============================================================================
@@ -24,7 +24,7 @@
     mode: '0755'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/common/"
   when:
-    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - (global_is_desktop | default(false)) or (global_is_laptop | default(false))
     - item.state == 'directory'
 
 - name: Deploy common static dotfiles
@@ -35,7 +35,7 @@
     mode: '0644'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/common/"
   when:
-    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - (global_is_desktop | default(false)) or (global_is_laptop | default(false))
     - item.state == 'file'
     - not item.path.endswith('.j2')
 
@@ -47,7 +47,7 @@
     mode: '0644'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/common/"
   when:
-    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - (global_is_desktop | default(false)) or (global_is_laptop | default(false))
     - item.state == 'file'
     - item.path.endswith('.j2')
 
@@ -62,7 +62,7 @@
     mode: '0755'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
   when:
-    - host_dotfiles_dir.stat.exists
+    - common_host_dotfiles_dir.stat.exists
     - item.state == 'directory'
 
 - name: Deploy host-specific static dotfiles
@@ -73,7 +73,7 @@
     mode: '0644'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
   when:
-    - host_dotfiles_dir.stat.exists
+    - common_host_dotfiles_dir.stat.exists
     - item.state == 'file'
     - not item.path.endswith('.j2')
 
@@ -85,7 +85,7 @@
     mode: '0644'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
   when:
-    - host_dotfiles_dir.stat.exists
+    - common_host_dotfiles_dir.stat.exists
     - item.state == 'file'
     - item.path.endswith('.j2')
 
@@ -100,7 +100,7 @@
     mode: '0755'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/ii-compat/"
   when:
-    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - (global_is_desktop | default(false)) or (global_is_laptop | default(false))
     - not (use_illogical_impulse | default(true))
     - item.state == 'directory'
 
@@ -112,7 +112,7 @@
     mode: '0644'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/ii-compat/"
   when:
-    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - (global_is_desktop | default(false)) or (global_is_laptop | default(false))
     - not (use_illogical_impulse | default(true))
     - item.state == 'file'
     - not item.path.endswith('.j2')
@@ -125,7 +125,7 @@
     mode: '0644'
   with_community.general.filetree: "{{ playbook_dir }}/dotfiles/ii-compat/"
   when:
-    - (is_desktop | default(false)) or (is_laptop | default(false))
+    - (global_is_desktop | default(false)) or (global_is_laptop | default(false))
     - not (use_illogical_impulse | default(true))
     - item.state == 'file'
     - item.path.endswith('.j2')

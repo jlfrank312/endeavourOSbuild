@@ -11,7 +11,7 @@
 - name: Import CachyOS GPG Key
   ansible.builtin.command: pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
 
-- name: Locally Sign CachyOS GPG Keyyes
+- name: Locally Sign CachyOS GPG Key
   ansible.builtin.command: pacman-key --lsign-key F3B607488DB35A47
 
 # --- Preparation to Convert to CachyOS Repo Mirrors ---
@@ -48,8 +48,6 @@
 
       [cachyos-extra-v3]
       Include = /etc/pacman.d/cachyos-v3-mirrorlist
-  register: cachyos_repos
-
 
 - name: Install CachyOS Keyring and Mirrorlists
   community.general.pacman:
@@ -59,7 +57,6 @@
       - cachyos-v3-mirrorlist
     update_cache: true
     state: present
-  register: cachyos_lists
 
 # --- CachyOS Conversion ---
 
@@ -72,8 +69,8 @@
 - name: Convert Pacman Cache to CachyOS
   # Forces Pacman to allow downgrading of packages if called for by newly-added CachyOS mirrors
   ansible.builtin.command: pacman -Syyuu --noconfirm
-  register: cachyos_conversion
-  changed_when: "'there is nothing to do' not in cachyos_conversion.stdout"
+  register: cachyos_conversion_status
+  changed_when: "'there is nothing to do' not in cachyos_conversion_status.stdout"
 
 # --- CachyOS Optimizations ---
 
@@ -92,24 +89,29 @@
     update_cache: true
     upgrade: true
 
-# --- Configure GRUB to boot using CachyOS kernel ---
+# --- Configure GRUB to boot using CachyOS kernel, and update GRUB if there is a new CachyOS Kernel ---
 
 - name: Set GRUB_DEFAULT to saved
   ansible.builtin.lineinfile:
     path: /etc/default/grub
     regexp: '^GRUB_DEFAULT='
     line: 'GRUB_DEFAULT=saved'
+  when: global_is_x86 | default(false)
 
 - name: Get root partition UUID
   ansible.builtin.command: findmnt -n -o UUID /
-  register: root_uuid
+  register: cachyos_conversion_root_uuid
   changed_when: false
+  when: global_is_x86 | default(false)
 
 - name: Set CachyOS kernel as GRUB default
   ansible.builtin.command: >
     grub-set-default
-    'gnulinux-advanced-{{ root_uuid.stdout | trim }}>gnulinux-linux-cachyos-advanced-{{ root_uuid.stdout | trim }}'
+    'gnulinux-advanced-{{ cachyos_conversion_root_uuid.stdout | trim }}>gnulinux-linux-cachyos-advanced-{{ root_uuid.stdout | trim }}'
   changed_when: true
+  when:
+    - global_is_x86 | default(false)
+    - global_supports_x86_64_v3 | default(false)
 
 - name: Regenerate GRUB config
   ansible.builtin.command: grub-mkconfig -o /boot/grub/grub.cfg

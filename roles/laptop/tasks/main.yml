@@ -3,7 +3,7 @@
 # 1. auto-cpufreq Setup
 # =============================================================================
 - name: Install python-typing_extensions (Required runtime dependency)
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: python-typing_extensions
     state: present
 
@@ -14,13 +14,13 @@
       '(?i)\[sudo\] password for {{ user_name }}': "{{ ansible_become_password }}"
       '(?i)password': "{{ ansible_become_password }}"
     timeout: 1800
-  become_user: "{{ user_name }}"
   become: true
+  become_user: "{{ user_name }}"
 
 - name: Enable and start auto-cpufreq service
   ansible.builtin.systemd:
     name: auto-cpufreq
-    enabled: yes
+    enabled: true
     state: started
 
 - name: Deploy auto-cpufreq configuration
@@ -36,19 +36,19 @@
 # 2. TLP Setup (Battery Management)
 # =============================================================================
 - name: Install TLP
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: tlp
     state: present
 
 - name: Mask power-profiles-daemon to prevent TLP conflict
   ansible.builtin.systemd:
     name: power-profiles-daemon
-    masked: yes
+    masked: true
 
 - name: Mask tlp-sleep service to prevent auto-cpufreq conflicts
   ansible.builtin.systemd:
     name: tlp-sleep.service
-    masked: yes
+    masked: true
 
 - name: Deploy TLP configuration
   ansible.builtin.template:
@@ -62,34 +62,34 @@
 - name: Enable and start TLP service
   ansible.builtin.systemd:
     name: tlp
-    enabled: yes
+    enabled: true
     state: started
 
 # =============================================================================
 # 3. Diagnostics & Firewall
 # =============================================================================
 - name: Install powertop (Intel diagnostics)
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: powertop
     state: present
-  when: has_intel_cpu | default(false)
+  when: global_has_intel_cpu | default(false)
 
 - name: Install firewalld
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: firewalld
     state: present
 
 - name: Enable and start firewalld service
   ansible.builtin.systemd:
     name: firewalld
-    enabled: yes
+    enabled: true
     state: started
 
 # =============================================================================
 # 4. GNOME Keyring (Auto-unlock on TTY login)
 # =============================================================================
 - name: Install GNOME keyring
-  ansible.builtin.pacman:
+  community.general.pacman:
     name:
       - gnome-keyring
       - gcr

@@ -7,7 +7,7 @@ CPU_ENERGY_PERF_POLICY_ON_AC=
 CPU_ENERGY_PERF_POLICY_ON_BAT=
 
 # Battery Charge Thresholds
-{% if supports_charge_threshold | default(false) %}
+{% if global_supports_charge_threshold | default(false) %}
 START_CHARGE_THRESH_BAT0={{ tlp_charge_start | default(75) }}
 STOP_CHARGE_THRESH_BAT0={{ tlp_charge_stop | default(80) }}
 {% else %}

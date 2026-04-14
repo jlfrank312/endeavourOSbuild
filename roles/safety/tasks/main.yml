@@ -1,5 +1,5 @@
 ---
-# --- Safety Tools ---
+# --- Safety tools ---
 
 - name: Install Kernel Safeguards (LTS)
   community.general.pacman:
@@ -7,7 +7,7 @@
       - linux-lts
       - linux-lts-headers
     state: present
-  when: is_x86 | default(false)
+  when: global_is_x86 | default(false)
 
 - name: Install BTRFS Safeguards (Snapper)
   community.general.pacman:
@@ -15,7 +15,7 @@
       - snapper
       - snap-pac         # Auto-snapshot on pacman update
     state: present
-  when: root_fstype == 'btrfs'
+  when: global_root_fstype == 'btrfs'
 
 - name: Install BTRFS Assistant GUI
   community.general.pacman:
@@ -23,15 +23,15 @@
       - btrfs-assistant  # GUI for managing snapshots
     state: present
   when:
-    - root_fstype == 'btrfs'
-    - is_desktop | default(false) or is_laptop | default(false)
+    - global_root_fstype == 'btrfs'
+    - global_is_desktop | default(false) or global_is_laptop | default(false)
 
 - name: Enable Snapper cleanup timer (Prevent disk filling)
   ansible.builtin.systemd:
     name: snapper-cleanup.timer
-    enabled: yes
+    enabled: true
     state: started
-  when: root_fstype == 'btrfs'
+  when: global_root_fstype == 'btrfs'
 
 # --- Activate Recovery Utilities ---
 
@@ -39,7 +39,7 @@
   ansible.builtin.command: snapper -c root create-config /
   args:
     creates: /etc/snapper/configs/root
-  when: root_fstype == 'btrfs'
+  when: global_root_fstype == 'btrfs'
 
 - name: Configure Snapper Permissions
   ansible.builtin.lineinfile:
@@ -50,28 +50,4 @@
     - { regexp: '^ALLOW_GROUPS=.*', line: 'ALLOW_GROUPS="wheel"' }
     - { regexp: '^TIMELINE_LIMIT_HOURLY=.*', line: 'TIMELINE_LIMIT_HOURLY="5"' }
     - { regexp: '^TIMELINE_LIMIT_DAILY=.*', line: 'TIMELINE_LIMIT_DAILY="7"' }
-  when: root_fstype == 'btrfs'
-
-# --- Update GRUB if there is a new CachyOS Kernel ---
-
-- name: Set GRUB_DEFAULT to saved
-  ansible.builtin.lineinfile:
-    path: /etc/default/grub
-    regexp: '^GRUB_DEFAULT='
-    line: 'GRUB_DEFAULT=saved'
-  when: is_x86 | default(false)
-
-- name: Get root partition UUID
-  ansible.builtin.command: findmnt -n -o UUID /
-  register: root_uuid
-  changed_when: false
-  when: is_x86 | default(false)
-
-- name: Set CachyOS kernel as GRUB default
-  ansible.builtin.command: >
-    grub-set-default
-    'gnulinux-advanced-{{ root_uuid.stdout | trim }}>gnulinux-linux-cachyos-advanced-{{ root_uuid.stdout | trim }}'
-  changed_when: true
-  when: 
-    - is_x86 | default(false)
-    - supports_x86_64_v3 | default(false)
+  when: global_root_fstype == 'btrfs'

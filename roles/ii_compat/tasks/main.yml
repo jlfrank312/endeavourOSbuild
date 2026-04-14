@@ -21,10 +21,10 @@
 # and retried via AUR. This handles the mixed repo/AUR reality of II's
 # dependency tree without requiring a manually maintained separation.
 - name: Attempt to install snapshot packages via pacman
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: "{{ ii_compat_packages }}"
     state: present
-  register: pacman_result
+  register: ii_compat_pacman_result
   failed_when: false
 
 # NOTE: The retry-via-AUR logic below is a placeholder.
@@ -34,7 +34,7 @@
 - name: Collect packages not found in official repos
   ansible.builtin.set_fact:
     aur_fallback_packages: >-
-      {{ pacman_result.stdout | default('')
+      {{ ii_compat_pacman_result.stdout | default('')
          | regex_findall("target not found: (\\S+)")
          | list }}
 
@@ -44,6 +44,7 @@
     state: present
     use: yay
     extra_args: "--sudoloop"
+  become: true
   become_user: "{{ user_name }}"
   when: aur_fallback_packages | length > 0
 
@@ -62,7 +63,7 @@
     state: directory
     owner: "{{ user_name }}"
     mode: '0755'
-  when: has_nvidia_gpu | default(false)
+  when: global_has_nvidia_gpu | default(false)
 
 - name: Deploy NVIDIA Hyprland environment variables
   ansible.builtin.copy:
@@ -77,11 +78,11 @@
       env = GBM_BACKEND,nvidia-drm
       env = __GLX_VENDOR_LIBRARY_NAME,nvidia
       env = NVD_BACKEND,direct
-  when: has_nvidia_gpu | default(false)
+  when: global_has_nvidia_gpu | default(false)
 
 - name: Ensure hyprland.conf sources NVIDIA env file
   ansible.builtin.lineinfile:
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/nvidia-env.conf"
     state: present
-  when: has_nvidia_gpu | default(false)
+  when: global_has_nvidia_gpu | default(false)

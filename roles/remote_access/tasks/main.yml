@@ -6,7 +6,7 @@
   community.general.pacman:
     name: freerdp
     state: present
-  when: is_laptop | default(false) or is_desktop | default(false)
+  when: global_is_laptop | default(false) or global_is_desktop | default(false)
 
 # =============================================================================
 # 2. Remote Connection Scripts
@@ -24,7 +24,7 @@
     state: directory
     owner: "{{ user_name }}"
     mode: '0700'
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 - name: Deploy work PC RDP file
   ansible.builtin.copy:
@@ -32,7 +32,7 @@
     content: "{{ workpc_rdp }}"
     owner: "{{ user_name }}"
     mode: '0600'
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 - name: Deploy work PC connection script
   ansible.builtin.copy:
@@ -43,7 +43,7 @@
       #!/bin/bash
       USERNAME=$(grep "^username:s:" ~/.config/freerdp/workpc.rdp | cut -d: -f3)
       xfreerdp3 ~/.config/freerdp/workpc.rdp /u:"$USERNAME" /d:""
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 - name: Deploy main PC connection script
   ansible.builtin.copy:
@@ -53,7 +53,7 @@
     content: |
       #!/bin/bash
       xfreerdp3 /v:{{ mainpc_smb_host }} /u:{{ mainpc_smb_user }} /d:"" /f
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 # =============================================================================
 # 3. Main PC SMB Shares
@@ -62,7 +62,7 @@
   community.general.pacman:
     name: cifs-utils
     state: present
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 - name: Ensure samba config directory exists
   ansible.builtin.file:
@@ -70,9 +70,9 @@
     state: directory
     owner: root
     mode: '0755'
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
-- name: Deploy SMB credentials file
+- name: Deploy SMB credentials file for shares from mainpc
   ansible.builtin.copy:
     dest: "/etc/samba/mainpc.creds"
     content: |
@@ -81,18 +81,18 @@
     owner: root
     group: root
     mode: '0600'
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
-- name: Create mount point directories
+- name: Create mount point directories for shares from mainpc
   ansible.builtin.file:
     path: "/mnt/mainpc/{{ item | lower }}"
     state: directory
     owner: root
     mode: '0755'
   loop: "{{ mainpc_smb_shares }}"
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
-- name: Deploy systemd mount units
+- name: Deploy systemd mount units for mainpc shares
   ansible.builtin.copy:
     dest: "/etc/systemd/system/mnt-mainpc-{{ item | lower }}.mount"
     owner: root
@@ -112,9 +112,9 @@
       [Install]
       WantedBy=multi-user.target
   loop: "{{ mainpc_smb_shares }}"
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
-- name: Deploy systemd automount units
+- name: Deploy systemd automount units for mainpc shares
   ansible.builtin.copy:
     dest: "/etc/systemd/system/mnt-mainpc-{{ item | lower }}.automount"
     owner: root
@@ -131,16 +131,16 @@
       [Install]
       WantedBy=multi-user.target
   loop: "{{ mainpc_smb_shares }}"
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
-- name: Enable and start automount units
+- name: Enable and start automount units for mainpc shares
   ansible.builtin.systemd:
     name: "mnt-mainpc-{{ item | lower }}.automount"
-    enabled: yes
+    enabled: true
     state: started
-    daemon_reload: yes
+    daemon_reload: true
   loop: "{{ mainpc_smb_shares }}"
-  when: is_laptop | default(false)
+  when: global_is_laptop | default(false)
 
 # =============================================================================
 # 4. Seedbox SSH Key & SSHFS Mount
@@ -170,7 +170,7 @@
   become: false
 
 - name: Install sshfs
-  ansible.builtin.pacman:
+  community.general.pacman:
     name: sshfs
     state: present
 
