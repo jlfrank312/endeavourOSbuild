@@ -128,7 +128,7 @@
 
 - name: Deploy wallpapers
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/dotfiles/wallpapers/{{ ansible_facts.hostname }}/"
+    src: "{{ playbook_dir }}/dotfiles/wallpapers/{{ ansible_facts['hostname'] }}/"
     dest: "/home/{{ user_name }}/Pictures/Wallpapers/"
     owner: "{{ user_name }}"
     mode: '0644'
