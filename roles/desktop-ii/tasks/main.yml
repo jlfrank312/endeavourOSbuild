@@ -7,8 +7,8 @@
     repo: https://github.com/end-4/dots-hyprland.git
     dest: "/home/{{ user_name }}/.cache/dots-hyprland"
     depth: 1
-    update: yes
-    force: yes
+    update: true
+    force: true
   become: false
 
 # =============================================================================
@@ -162,7 +162,7 @@
 # 3-P. Deploy Display Color Profile
 # =============================================================================
 - name: Install xiccd for Wayland ICC profile support
-  ansible.builtin.pacman:
+  community.general.pacman:
     name:
       - xiccd
       - colord
@@ -171,7 +171,7 @@
 - name: Enable colord service
   ansible.builtin.systemd:
     name: colord
-    enabled: yes
+    enabled: true
     state: started
 
 - name: Copy ICC profiles to colord directory
