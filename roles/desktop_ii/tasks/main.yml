@@ -210,7 +210,7 @@
 
 - name: Deploy Firefox user.js
   ansible.builtin.copy:
-    src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}//.config/firefox/user.js"
+    src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/.config/firefox/user.js"
     dest: "{{ item.path }}/user.js"
     owner: "{{ user_name }}"
     mode: '0644'
