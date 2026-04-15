@@ -3,7 +3,7 @@
 # =============================================================================
 - name: Load II dependency snapshot
   ansible.builtin.include_vars:
-    file: "{{ playbook_dir }}/roles/ii-compat/vars/snapshot.yml"
+    file: "{{ playbook_dir }}/roles/ii_compat/vars/snapshot.yml"
 
 - name: Abort if snapshot has not been generated
   ansible.builtin.fail:
