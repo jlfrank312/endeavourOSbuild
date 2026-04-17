@@ -42,12 +42,17 @@ ansible-galaxy collection install -r requirements.yml
 echo ":: Running Ansible Playbook ::"
 echo "=== Bootstrap run: $(date) ===" | tee -a ~/bootstrap.log
 HOSTNAME=$(hostname)
+LIMIT=""
 if [ "$HOSTNAME" = "tabula" ]; then
     LIMIT="laptop"
 elif [ "$HOSTNAME" = "locus" ]; then
     LIMIT="main-pc"
 fi
 
+if [ -z "$LIMIT" ]; then
+    echo ":: ERROR: Unknown hostname '$HOSTNAME', cannot determine playbook limit ::"
+    exit 1
+fi
 ansible-playbook site.yml -i inventory/ --connection=local --limit "$LIMIT" 2>&1 | tee -a ~/bootstrap.log
 
 echo ":: System Bootstrap Complete ::"

@@ -187,7 +187,6 @@
     - office.icc
   become: true
   when: global_is_laptop | default(false)
-  failed_when: false
 
 - name: Start xiccd and assign gaming profile to display
   ansible.builtin.shell: |
