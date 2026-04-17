@@ -41,6 +41,13 @@ ansible-galaxy collection install -r requirements.yml
 # 5. Run the playbook
 echo ":: Running Ansible Playbook ::"
 echo "=== Bootstrap run: $(date) ===" | tee -a ~/bootstrap.log
-ansible-playbook site.yml -i inventory/ --connection=local --limit laptop 2>&1 | tee -a ~/bootstrap.log
+HOSTNAME=$(hostname)
+if [ "$HOSTNAME" = "tabula" ]; then
+    LIMIT="laptop"
+elif [ "$HOSTNAME" = "locus" ]; then
+    LIMIT="main-pc"
+fi
+
+ansible-playbook site.yml -i inventory/ --connection=local --limit "$LIMIT" 2>&1 | tee -a ~/bootstrap.log
 
 echo ":: System Bootstrap Complete ::"
