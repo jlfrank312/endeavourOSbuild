@@ -26,3 +26,5 @@ arturia_uuid: ""
 # =============================================================================
 user_uid: ""
 user_gid: ""
+
+nvidia_use_open_modules: true
