@@ -2,12 +2,19 @@
 # =============================================================================
 # 1a. Driver Installation (Open Kernel Modules — Turing/Ampere/Ada/Hopper+)
 # =============================================================================
+- name: Remove conflicting pre-built nvidia-open-dkms if present
+  community.general.pacman:
+    name: nvidia-open-dkms
+    state: absent
+  failed_when: false
+  when: nvidia_use_open_modules | default(true)
+
 - name: Install NVIDIA open kernel modules (Turing and newer)
-  ansible.builtin.pacman:
+  community.general.pacman:
     name:
       - egl-gbm
       - egl-wayland
-      - nvidia-open-dkms
+      - nvidia-open
       - nvidia-utils
       - lib32-nvidia-utils
     state: present
@@ -16,8 +23,15 @@
 # =============================================================================
 # 1b. Driver Installation (Proprietary — legacy 580xx stack)
 # =============================================================================
+- name: Remove conflicting pre-built nvidia-open if present
+  community.general.pacman:
+    name: nvidia-open
+    state: absent
+  failed_when: false
+  when: not (nvidia_use_open_modules | default(true))
+
 - name: Install NVIDIA proprietary drivers (580xx legacy stack)
-  ansible.builtin.pacman:
+  community.general.pacman:
     name:
       - egl-gbm
       - egl-wayland
