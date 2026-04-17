@@ -38,7 +38,7 @@
 # 3. Base Packages & mDNS (Avahi) Setup
 # =============================================================================
 - name: Install base system utilities and Avahi
-  ansible.builtin.pacman:
+  community.general.pacman:
     name:
       - base-devel
       - git
