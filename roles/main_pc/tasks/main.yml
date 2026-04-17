@@ -103,15 +103,58 @@
       [Unit]
       Description=Mount arturia (Windows C)
       After=local-fs.target
+      AssertPathExists=/dev/disk/by-uuid/{{ arturia_uuid }}
 
       [Mount]
       What=/dev/disk/by-uuid/{{ arturia_uuid }}
       Where=/mnt/arturia
       Type=ntfs3
-      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,ro,noatime
+      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,ro,noatime,errors=remount-ro
 
       [Install]
       WantedBy=multi-user.target
+
+# =============================================================================
+# Arturia (Windows C) On-Demand Mount
+# =============================================================================
+- name: Deploy arturia automount unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-arturia.automount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Automount arturia (Windows C) on demand
+      After=local-fs.target
+      AssertPathExists=/dev/disk/by-uuid/{{ arturia_uuid }}
+
+      [Automount]
+      Where=/mnt/arturia
+      TimeoutIdleSec=300
+
+      [Install]
+      WantedBy=multi-user.target
+  when: arturia_uuid | default('') | length > 0
+
+- name: Deploy mount-arturia script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.local/bin/mount-arturia"
+    owner: "{{ user_name }}"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      sudo systemctl start mnt-arturia.automount
+      echo "arturia mounted. Remember to run umount-arturia before booting Windows."
+
+- name: Deploy umount-arturia script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.local/bin/umount-arturia"
+    owner: "{{ user_name }}"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      sudo systemctl stop mnt-arturia.automount
+      echo "arturia unmounted. Safe to boot Windows."
 
 # =============================================================================
 # 3. Enable and Start Mount Units
@@ -127,7 +170,6 @@
     - mnt-lily.mount
     - mnt-mordred.mount
     - mnt-nero.mount
-    - mnt-arturia.mount
   when: alter_uuid | default('') | length > 0
 
 # =============================================================================
