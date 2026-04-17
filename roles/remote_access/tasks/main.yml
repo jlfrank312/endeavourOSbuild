@@ -1,5 +1,19 @@
 ---
 # =============================================================================
+# 0. State Checks
+# =============================================================================
+- name: Check if SSH public key exists for this host
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/.ssh/id_ed25519.pub"
+  register: remote_access_ssh_pubkey_stat
+  delegate_to: localhost
+  become: false
+
+- name: Set SSH key availability fact
+  ansible.builtin.set_fact:
+    remote_access_has_ssh_key: "{{ remote_access_ssh_pubkey_stat.stat.exists }}"
+
+# =============================================================================
 # 1. FreeRDP
 # =============================================================================
 - name: Install FreeRDP
@@ -32,7 +46,7 @@
     content: "{{ workpc_rdp }}"
     owner: "{{ user_name }}"
     mode: '0600'
-  when: global_is_laptop | default(false)
+  when: global_is_laptop | default(false) or global_is_desktop | default(false)
 
 - name: Deploy work PC connection script
   ansible.builtin.copy:
@@ -43,7 +57,7 @@
       #!/bin/bash
       USERNAME=$(grep "^username:s:" ~/.config/freerdp/workpc.rdp | cut -d: -f3)
       xfreerdp3 ~/.config/freerdp/workpc.rdp /u:"$USERNAME" /d:""
-  when: global_is_laptop | default(false)
+  when: global_is_laptop | default(false) or global_is_desktop | default(false)
 
 - name: Deploy main PC connection script
   ansible.builtin.copy:
@@ -152,6 +166,7 @@
     owner: "{{ user_name }}"
     mode: '0700'
   become: false
+  when: remote_access_has_ssh_key
 
 - name: Deploy SSH private key
   ansible.builtin.copy:
@@ -160,6 +175,7 @@
     owner: "{{ user_name }}"
     mode: '0600'
   become: false
+  when: remote_access_has_ssh_key
 
 - name: Deploy SSH public key
   ansible.builtin.copy:
@@ -168,11 +184,13 @@
     owner: "{{ user_name }}"
     mode: '0644'
   become: false
+  when: remote_access_has_ssh_key
 
 - name: Install sshfs
   community.general.pacman:
     name: sshfs
     state: present
+  when: remote_access_has_ssh_key
 
 - name: Create seedbox mount point
   ansible.builtin.file:
@@ -180,6 +198,7 @@
     state: directory
     owner: "{{ user_name }}"
     mode: '0755'
+  when: remote_access_has_ssh_key
 
 - name: Deploy seedbox SSH config
   ansible.builtin.copy:
@@ -192,6 +211,7 @@
           User {{ seedbox_user }}
           IdentityFile ~/.ssh/id_ed25519
   become: false
+  when: remote_access_has_ssh_key
 
 - name: Deploy seedbox connection script
   ansible.builtin.copy:
@@ -202,11 +222,13 @@
       #!/bin/bash
       ssh {{ seedbox_user }}@{{ seedbox_host }}
   become: false
+  when: remote_access_has_ssh_key
 
 - name: Get user UID and GID
   ansible.builtin.getent:
     database: passwd
     key: "{{ user_name }}"
+  when: remote_access_has_ssh_key
 
 - name: Deploy systemd mount unit for seedbox
   ansible.builtin.copy:
@@ -227,6 +249,7 @@
 
       [Install]
       WantedBy=multi-user.target
+  when: remote_access_has_ssh_key
 
 - name: Deploy systemd automount unit for seedbox
   ansible.builtin.copy:
@@ -244,6 +267,7 @@
 
       [Install]
       WantedBy=multi-user.target
+  when: remote_access_has_ssh_key
 
 - name: Enable and start seedbox automount
   ansible.builtin.systemd:
@@ -251,3 +275,4 @@
     enabled: true
     state: started
     daemon_reload: true
+  when: remote_access_has_ssh_key
