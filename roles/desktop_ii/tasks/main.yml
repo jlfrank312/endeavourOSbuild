@@ -132,7 +132,7 @@
     dest: "/home/{{ user_name }}/Pictures/Wallpapers/"
     owner: "{{ user_name }}"
     mode: '0644'
-  failed_when: false
+  when: lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts['hostname'] + '/*') | length > 0
 
 # =============================================================================
 # 3-C. Misc Config Deployments
@@ -186,7 +186,9 @@
     - health.icc
     - office.icc
   become: true
-  when: global_is_laptop | default(false)
+  when:
+    - global_is_laptop | default(false)
+    - lookup('fileglob', playbook_dir + '/dotfiles/' + ansible_facts['hostname'] + '/display_profiles/gaming.icc') | length > 0
 
 - name: Start xiccd and assign gaming profile to display
   ansible.builtin.shell: |
@@ -217,8 +219,9 @@
     mode: '0644'
   loop: "{{ desktop_ii_firefox_profile_dir.files | default([]) }}"
   become: false
-  when: desktop_ii_firefox_profile_dir.files | default([]) | length > 0
-  failed_when: false
+  when: >
+    desktop_ii_firefox_profile_dir.files | default([]) | length > 0 and
+    lookup('fileglob', playbook_dir + '/dotfiles/' + ansible_facts['hostname'] + '/.config/firefox/user.js') | length > 0
 
 # =============================================================================
 # 4. II-Compat Snapshot
