@@ -12,7 +12,7 @@ _PostInstallCommands() {
     local -r repo_dir="$home_dir/setup/endeavourOSbuild"
 
     # Install prerequisites
-    pacman -S --noconfirm --needed git ansible python-pexpect
+    pacman -S --noconfirm --needed git ansible python-pexpect tmux
 
     # Install ansible-galaxy collections
     sudo -u "$username" ansible-galaxy collection install \
