@@ -43,10 +43,9 @@
 # 2. Development Tools
 # =============================================================================
 - name: Install development tools
-  ansible.builtin.pacman:
+  community.general.pacman:
     name:
       - ansible-lint
       - yamllint
       - python-pip
     state: present
-    
