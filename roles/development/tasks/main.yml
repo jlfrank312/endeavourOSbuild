@@ -3,13 +3,14 @@
 # 1. VS Code
 # =============================================================================
 - name: Install VS Code
-  kewlfft.aur.aur:
-    name: visual-studio-code-bin
-    state: present
-    use: yay
-    extra_args: "--sudoloop"
-  become_user: "{{ user_name }}"
+  ansible.builtin.expect:
+    command: yay -S visual-studio-code-bin --sudoloop --noconfirm --needed
+    responses:
+      '(?i)\[sudo\] password for {{ user_name }}': "{{ ansible_become_password }}"
+      '(?i)password': "{{ ansible_become_password }}"
+    timeout: 3600
   become: true
+  become_user: "{{ user_name }}"
 
 - name: Ensure VS Code extensions directory exists
   ansible.builtin.file:
