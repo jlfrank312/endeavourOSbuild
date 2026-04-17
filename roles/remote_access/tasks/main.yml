@@ -38,7 +38,7 @@
     state: directory
     owner: "{{ user_name }}"
     mode: '0700'
-  when: global_is_laptop | default(false)
+  when: global_is_laptop | default(false) or global_is_desktop | default(false)
 
 - name: Deploy work PC RDP file
   ansible.builtin.copy:

@@ -132,6 +132,7 @@
     dest: "/home/{{ user_name }}/Pictures/Wallpapers/"
     owner: "{{ user_name }}"
     mode: '0644'
+  failed_when: false
 
 # =============================================================================
 # 3-C. Misc Config Deployments
@@ -186,6 +187,7 @@
     - office.icc
   become: true
   when: global_is_laptop | default(false)
+  failed_when: false
 
 - name: Start xiccd and assign gaming profile to display
   ansible.builtin.shell: |
@@ -217,6 +219,7 @@
   loop: "{{ desktop_ii_firefox_profile_dir.files | default([]) }}"
   become: false
   when: desktop_ii_firefox_profile_dir.files | default([]) | length > 0
+  failed_when: false
 
 # =============================================================================
 # 4. II-Compat Snapshot
