@@ -43,6 +43,9 @@
         - (global_is_desktop | default(false) or global_is_laptop | default(false))
         - not (use_illogical_impulse | default(true))
 
+    - role: main_pc
+      when: global_is_desktop | default(false)
+
     - role: laptop
       when:
         - global_is_laptop | default(false)

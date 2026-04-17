@@ -10,3 +10,19 @@ hyprland_vrr: 2    # fullscreen only — safe default for OLED
 # =============================================================================
 # monitor_primary: DP-1       # Alienware OLED ultrawide — confirm connector
 # monitor_secondary: DP-2     # second monitor — confirm connector
+# =============================================================================
+# Data Partition UUIDs
+# Populate after install with: lsblk -f
+# =============================================================================
+alter_uuid: ""
+lily_uuid: ""
+mordred_uuid: ""
+nero_uuid: ""
+arturia_uuid: ""
+
+# =============================================================================
+# User UID/GID for NTFS mount ownership
+# Populate after install with: id jordan
+# =============================================================================
+user_uid: ""
+user_gid: ""
