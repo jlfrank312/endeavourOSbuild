@@ -128,7 +128,7 @@
     - mnt-mordred.mount
     - mnt-nero.mount
     - mnt-arturia.mount
-  failed_when: false
+  when: alter_uuid | default('') | length > 0
 
 # =============================================================================
 # 4. alter Directory Structure
