@@ -128,6 +128,7 @@
     - mnt-mordred.mount
     - mnt-nero.mount
     - mnt-arturia.mount
+  failed_when: false
 
 # =============================================================================
 # 4. alter Directory Structure
