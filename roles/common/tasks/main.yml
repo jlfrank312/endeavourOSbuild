@@ -27,7 +27,7 @@
 - name: Configure temporary passwordless sudo for yay bootstrap
   ansible.builtin.lineinfile:
     path: /etc/sudoers.d/{{ user_name }}
-    create: yes
+    create: true
     mode: '0440'
     line: '{{ user_name }} ALL=(ALL) NOPASSWD: ALL'
     validate: 'visudo -cf %s'
@@ -48,13 +48,23 @@
       - avahi
       - nss-mdns
       - python-pexpect
+      - fwupd
+      - smartmontools
+      - nvme-cli
+      - wayland-utils
     state: present
     update_cache: false
 
 - name: Enable and start Avahi daemon
   ansible.builtin.systemd:
     name: avahi-daemon
-    enabled: yes
+    enabled: true
+    state: started
+
+- name: Enable fwupd service
+  ansible.builtin.systemd:
+    name: fwupd
+    enabled: true
     state: started
 
 - name: Configure nsswitch.conf for mDNS hostname resolution

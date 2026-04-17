@@ -27,3 +27,5 @@ seedbox_host: "{{ vault_seedbox_host }}"
 seedbox_user: "{{ vault_seedbox_user }}"
 
 seedbox_name: "{{ vault_seedbox_name }}"
+
+fwupd_bios_guid: "{{ lookup('vars', 'vault_' + ansible_facts['hostname'] + '_fwupd_bios_guid', default='') }}"

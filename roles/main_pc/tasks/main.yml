@@ -1,0 +1,237 @@
+---
+# =============================================================================
+# 1. Mount Point Creation
+# =============================================================================
+- name: Create mount point directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    mode: '0755'
+  loop:
+    - /mnt/alter
+    - /mnt/lily
+    - /mnt/mordred
+    - /mnt/nero
+    - /mnt/arturia
+
+# =============================================================================
+# 2. Systemd Mount Units
+# =============================================================================
+- name: Deploy alter mount unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-alter.mount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount alter data partition (CT2000 D)
+      After=local-fs.target
+
+      [Mount]
+      What=/dev/disk/by-uuid/{{ alter_uuid }}
+      Where=/mnt/alter
+      Type=ext4
+      Options=defaults,noatime
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Deploy lily mount unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-lily.mount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount lily (CT2000 B)
+      After=local-fs.target
+
+      [Mount]
+      What=/dev/disk/by-uuid/{{ lily_uuid }}
+      Where=/mnt/lily
+      Type=ntfs3
+      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Deploy mordred mount unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-mordred.mount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount mordred (NVMe CT1000 E)
+      After=local-fs.target
+
+      [Mount]
+      What=/dev/disk/by-uuid/{{ mordred_uuid }}
+      Where=/mnt/mordred
+      Type=ntfs3
+      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Deploy nero mount unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-nero.mount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount nero (HP EX950 A)
+      After=local-fs.target
+
+      [Mount]
+      What=/dev/disk/by-uuid/{{ nero_uuid }}
+      Where=/mnt/nero
+      Type=ntfs3
+      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Deploy arturia mount unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/mnt-arturia.mount
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount arturia (Windows C)
+      After=local-fs.target
+
+      [Mount]
+      What=/dev/disk/by-uuid/{{ arturia_uuid }}
+      Where=/mnt/arturia
+      Type=ntfs3
+      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,ro,noatime
+
+      [Install]
+      WantedBy=multi-user.target
+
+# =============================================================================
+# 3. Enable and Start Mount Units
+# =============================================================================
+- name: Enable and start mount units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - mnt-alter.mount
+    - mnt-lily.mount
+    - mnt-mordred.mount
+    - mnt-nero.mount
+    - mnt-arturia.mount
+
+# =============================================================================
+# 4. alter Directory Structure
+# =============================================================================
+- name: Create alter directory structure
+  ansible.builtin.file:
+    path: "/mnt/alter/{{ item }}"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+  loop:
+    - Downloads
+    - Documents
+    - Pictures
+    - Videos
+    - Music
+    - Books
+    - Projects
+    - Games
+    - Models
+    - Backups
+    - Clutter
+    - System
+
+# =============================================================================
+# 5. Home Directory Symlinks
+# =============================================================================
+- name: Remove existing XDG home directories if present
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/{{ item }}"
+    state: absent
+  loop:
+    - Downloads
+    - Documents
+    - Pictures
+    - Videos
+    - Music
+    - Books
+    - Projects
+    - Notes
+    - Games
+    - Clutter
+
+- name: Create home directory symlinks to alter
+  ansible.builtin.file:
+    src: "/mnt/alter/{{ item }}"
+    dest: "/home/{{ user_name }}/{{ item }}"
+    state: link
+    owner: "{{ user_name }}"
+  loop:
+    - Downloads
+    - Documents
+    - Pictures
+    - Videos
+    - Music
+    - Books
+    - Projects
+    - Notes
+    - Games
+    - Clutter
+
+# # =============================================================================
+# # 6. Application Data Symlinks
+# # =============================================================================
+# - name: Remove existing application data directories if present
+#   ansible.builtin.file:
+#     path: "{{ item }}"
+#     state: absent
+#   loop:
+#     - "/home/{{ user_name }}/.thunderbird"
+#     - "/home/{{ user_name }}/.config/mozilla"
+
+# - name: Create application data symlinks to alter/System
+#   ansible.builtin.file:
+#     src: "{{ item.src }}"
+#     dest: "{{ item.dest }}"
+#     state: link
+#     owner: "{{ user_name }}"
+#   loop:
+#     - { src: "/mnt/alter/System/thunderbird", dest: "/home/{{ user_name }}/.thunderbird" }
+#     - { src: "/mnt/alter/System/firefox", dest: "/home/{{ user_name }}/.config/mozilla" }
+
+# # =============================================================================
+# # 7. Ollama Models Directory
+# # =============================================================================
+# - name: Ensure Ollama models directory exists on alter
+#   ansible.builtin.file:
+#     path: /mnt/alter/Models
+#     state: directory
+#     owner: "{{ user_name }}"
+#     mode: '0755'
+
+# =============================================================================
+# OS Prober (Windows dual-boot detection)
+# =============================================================================
+- name: Install os-prober
+  community.general.pacman:
+    name: os-prober
+    state: present
+
+- name: Enable os-prober in GRUB config
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: '^#?GRUB_DISABLE_OS_PROBER='
+    line: 'GRUB_DISABLE_OS_PROBER=false'
+    state: present
+  notify: Regenerate GRUB
