@@ -143,6 +143,14 @@
     line: "include ~/.config/kitty/user.conf"
     state: present
 
+- name: Deploy user.fish
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/dotfiles/common/.config/fish/user.fish"
+    dest: "/home/{{ user_name }}/.config/fish/user.fish"
+    owner: "{{ user_name }}"
+    mode: '0644'
+  become: false
+
 - name: Ensure Fish config sources user.fish
   ansible.builtin.lineinfile:
     path: "/home/{{ user_name }}/.config/fish/config.fish"
