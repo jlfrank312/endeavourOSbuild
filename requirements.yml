@@ -1,4 +1,5 @@
-collections:  
+---
+collections:
   - name: kewlfft.aur
     version: ">=0.7.0"
   - name: community.docker

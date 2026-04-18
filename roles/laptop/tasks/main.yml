@@ -102,3 +102,12 @@
     block: |
       auth     optional  pam_gnome_keyring.so
       session  optional  pam_gnome_keyring.so auto_start
+# =============================================================================
+# 3-C. Misc Config Deployments
+# =============================================================================
+- name: Set default gamma in II Hyprsunset service (laptop)
+  ansible.builtin.lineinfile:
+    path: "/home/{{ user_name }}/.config/quickshell/ii/services/Hyprsunset.qml"
+    regexp: '^\s*property int gamma: \d+'
+    line: '    property int gamma: 95'
+  when: use_illogical_impulse | default(false)
