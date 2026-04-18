@@ -276,3 +276,55 @@
     line: 'GRUB_DISABLE_OS_PROBER=false'
     state: present
   notify: Regenerate GRUB
+
+# =============================================================================
+# Hyprland Monitor Configuration
+# =============================================================================
+- name: Deploy Hyprland monitor configurations
+  when: use_hyprland | default(false)
+  block:
+    - name: Ensure Hyprland custom config directory exists
+      ansible.builtin.file:
+        path: "/home/{{ user_name }}/.config/hypr/custom"
+        state: directory
+        owner: "{{ user_name }}"
+        mode: '0755'
+
+    - name: Deploy Hyprland monitor configuration
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/.config/hypr/custom/monitors.conf"
+        dest: "/home/{{ user_name }}/.config/hypr/custom/monitors.conf"
+        owner: "{{ user_name }}"
+        mode: '0644'
+
+    - name: Ensure hyprland.conf sources monitors config
+      ansible.builtin.lineinfile:
+        path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
+        line: "source = ~/.config/hypr/custom/monitors.conf"
+        state: present
+
+# =============================================================================
+# Mainpc Utility Script Deployment
+# =============================================================================
+- name: Deploy scripts to toggle DP-1 HDR in Hyprland
+  when: use_hyprland | default(false)
+  block:
+    - name: Deploy hdr-on script
+      ansible.builtin.copy:
+        dest: "/home/{{ user_name }}/.local/bin/hdr-on"
+        owner: "{{ user_name }}"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          hyprctl keyword monitor DP-1,3440x1440@239.98,2560x0,1,hdr:1
+          echo "HDR enabled on AW3425DW"
+
+    - name: Deploy hdr-off script
+      ansible.builtin.copy:
+        dest: "/home/{{ user_name }}/.local/bin/hdr-off"
+        owner: "{{ user_name }}"
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          hyprctl keyword monitor DP-1,3440x1440@239.98,2560x0,1
+          echo "HDR disabled on AW3425DW"

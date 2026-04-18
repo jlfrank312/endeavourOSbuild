@@ -135,39 +135,7 @@
   when: lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts['hostname'] + '/*') | length > 0
 
 # =============================================================================
-# 3-C. Misc Config Deployments
-# =============================================================================
-# - name: Ensure kitty.conf includes user config
-#   ansible.builtin.lineinfile:
-#     path: "/home/{{ user_name }}/.config/kitty/kitty.conf"
-#     line: "include ~/.config/kitty/user.conf"
-#     state: present
-
-# - name: Deploy user.fish
-#   ansible.builtin.copy:
-#     src: "{{ playbook_dir }}/dotfiles/common/.config/fish/user.fish"
-#     dest: "/home/{{ user_name }}/.config/fish/user.fish"
-#     owner: "{{ user_name }}"
-#     mode: '0644'
-#   become: false
-
-# - name: Ensure Fish config sources user.fish
-#   ansible.builtin.lineinfile:
-#     path: "/home/{{ user_name }}/.config/fish/config.fish"
-#     regexp: '^\s*source\s+~/.config/fish/user\.fish'
-#     line: "    source ~/.config/fish/user.fish"
-#     insertafter: "^if status is-interactive"
-#     state: present
-#   become: false
-
-# - name: Set default gamma in II Hyprsunset service (laptop)
-#   ansible.builtin.lineinfile:
-#     path: "/home/{{ user_name }}/.config/quickshell/ii/services/Hyprsunset.qml"
-#     regexp: '^\s*property int gamma: \d+'
-#     line: '    property int gamma: 95'
-#   when: global_is_laptop | default(false)
-# =============================================================================
-# 3-X. Re-deploy Common Desktop Dotfiles (Confirm II install didn't remove them)
+# 3-X. Deploy Common Desktop Dotfiles
 # =============================================================================
 - name: Ensure directories exist for common dotfiles
   ansible.builtin.file:
@@ -210,40 +178,38 @@
   delegate_to: localhost
   become: false
 
-- name: Ensure directories exist for host-specific dotfiles (II)
-  ansible.builtin.file:
-    path: "/home/{{ user_name }}/{{ item.path }}"
-    state: directory
-    owner: "{{ user_name }}"
-    mode: '0755'
-  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
-  when:
-    - desktop_ii_host_dotfiles_dir.stat.exists
-    - item.state == 'directory'
+- block:
+    - name: Ensure directories exist for host-specific dotfiles (II)
+      ansible.builtin.file:
+        path: "/home/{{ user_name }}/{{ item.path }}"
+        state: directory
+        owner: "{{ user_name }}"
+        mode: '0755'
+      with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
+      when: item.state == 'directory'
 
-- name: Deploy host-specific static dotfiles (II)
-  ansible.builtin.copy:
-    src: "{{ item.src }}"
-    dest: "/home/{{ user_name }}/{{ item.path }}"
-    owner: "{{ user_name }}"
-    mode: '0644'
-  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
-  when:
-    - desktop_ii_host_dotfiles_dir.stat.exists
-    - item.state == 'file'
-    - not item.path.endswith('.j2')
+    - name: Deploy host-specific static dotfiles (II)
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "/home/{{ user_name }}/{{ item.path }}"
+        owner: "{{ user_name }}"
+        mode: '0644'
+      with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
+      when:
+        - item.state == 'file'
+        - not item.path.endswith('.j2')
 
-- name: Deploy host-specific templated dotfiles (II)
-  ansible.builtin.template:
-    src: "{{ item.src }}"
-    dest: "/home/{{ user_name }}/{{ item.path | regex_replace('\\.j2$', '') }}"
-    owner: "{{ user_name }}"
-    mode: '0644'
-  with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
-  when:
-    - desktop_ii_host_dotfiles_dir.stat.exists
-    - item.state == 'file'
-    - item.path.endswith('.j2')
+    - name: Deploy host-specific templated dotfiles (II)
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "/home/{{ user_name }}/{{ item.path | regex_replace('\\.j2$', '') }}"
+        owner: "{{ user_name }}"
+        mode: '0644'
+      with_community.general.filetree: "{{ playbook_dir }}/dotfiles/{{ ansible_facts['hostname'] }}/"
+      when:
+        - item.state == 'file'
+        - item.path.endswith('.j2')
+  when: desktop_ii_host_dotfiles_dir.stat.exists
 
 # =============================================================================
 # 3-P. Deploy Display Color Profile
@@ -312,33 +278,33 @@
 # =============================================================================
 # 4. II-Compat Snapshot
 # =============================================================================
-- name: Snapshot II dependencies for ii_compat fallback
-  ansible.builtin.shell: |
-    pacman -Qq | grep '^illogical-impulse-' | xargs pacman -Qi \
-    | grep "^Depends On" \
-    | sed 's/Depends On\s*:\s*//' \
-    | tr ' ' '\n' \
-    | grep -v '^None$\|^$' \
-    | sed 's/[>=<].*//' \
-    | sort -u
-  register: desktop_ii_snapshot_raw
-  changed_when: false
-  tags: [snapshot-ii]
-  when: "'snapshot-ii' in ansible_run_tags"
-  become: false
+- block:
+    - name: Snapshot II dependencies for ii_compat fallback
+      ansible.builtin.shell: |
+        pacman -Qq | grep '^illogical-impulse-' | xargs pacman -Qi \
+        | grep "^Depends On" \
+        | sed 's/Depends On\s*:\s*//' \
+        | tr ' ' '\n' \
+        | grep -v '^None$\|^$' \
+        | sed 's/[>=<].*//' \
+        | sort -u
+      register: desktop_ii_snapshot_raw
+      changed_when: false
+      tags: [snapshot-ii]
+      become: false
 
-- name: Write II dependency snapshot to ii-compat vars
-  ansible.builtin.copy:
-    dest: "{{ playbook_dir }}/roles/ii_compat/vars/snapshot.yml"
-    content: |
-      # Auto-generated by desktop_ii role after verified II install
-      # Do not edit manually — regenerate with: make snapshot-ii
-      # Last generated: {{ ansible_date_time.iso8601 }}
-      ii_compat_packages:
-      {% for pkg in desktop_ii_snapshot_raw.stdout_lines %}
-        - {{ pkg }}
-      {% endfor %}
-  delegate_to: localhost
-  tags: [snapshot-ii]
+    - name: Write II dependency snapshot to ii-compat vars
+      ansible.builtin.copy:
+        dest: "{{ playbook_dir }}/roles/ii_compat/vars/snapshot.yml"
+        content: |
+          # Auto-generated by desktop_ii role after verified II install
+          # Do not edit manually — regenerate with: make snapshot-ii
+          # Last generated: {{ ansible_date_time.iso8601 }}
+          ii_compat_packages:
+          {% for pkg in desktop_ii_snapshot_raw.stdout_lines %}
+            - {{ pkg }}
+          {% endfor %}
+      delegate_to: localhost
+      tags: [snapshot-ii]
+      become: false
   when: "'snapshot-ii' in ansible_run_tags"
-  become: false

@@ -1,3 +1,4 @@
+---
 # =============================================================================
 # Display (Hyprland)
 # =============================================================================
@@ -28,3 +29,9 @@ user_uid: ""
 user_gid: ""
 
 nvidia_use_open_modules: true
+
+monitor_primary: DP-1      # Dell AW3425DW center
+monitor_secondary: DP-3    # LG UltraGear left
+monitor_tertiary: DP-2     # BenQ GW2780 right
+
+monitor_primary_hdr: true
