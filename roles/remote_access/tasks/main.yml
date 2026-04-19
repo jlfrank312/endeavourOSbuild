@@ -9,9 +9,15 @@
   delegate_to: localhost
   become: false
 
+# Guard requires both file existence AND non-zero size.
+# A zero-byte placeholder (committed before first-run keygen) must not be
+# treated as a deployable key — it would trigger the vault lookup and the
+# seedbox/SSHFS tasks against an absent vault variable.
 - name: Set SSH key availability fact
   ansible.builtin.set_fact:
-    remote_access_has_ssh_key: "{{ remote_access_ssh_pubkey_stat.stat.exists }}"
+    remote_access_has_ssh_key: >-
+      {{ remote_access_ssh_pubkey_stat.stat.exists and
+         (remote_access_ssh_pubkey_stat.stat.size | default(0)) > 0 }}
 
 # =============================================================================
 # 0a. SSH Server
@@ -41,6 +47,9 @@
 #   1. Run playbook → section 0c generates a keypair and prints the pubkey.
 #   2. Commit the pubkey to dotfiles/<hostname>/.ssh/id_ed25519.pub.
 #   3. Re-run the playbook → this task distributes it to all peers.
+#
+# Zero-byte placeholder files (committed before step 2) are filtered out
+# so that the authorized_key module never receives an empty key string.
 # =============================================================================
 - name: Ensure .ssh directory exists
   ansible.builtin.file:
@@ -59,6 +68,7 @@
     {{ query('fileglob', playbook_dir + '/dotfiles/*/.ssh/id_ed25519.pub')
        | reject('search', '/' + ansible_facts['hostname'] + '/')
        | list }}
+  when: lookup('file', item) | trim | length > 0
   become: false
 
 # =============================================================================
@@ -164,7 +174,13 @@
   when: global_is_laptop | default(false)
 
 # =============================================================================
-# 3. Main PC SMB Shares
+# 3. Main PC SMB Shares (tabula only)
+#
+# mainpc is the Windows identity of the same hardware as locus.
+# These SMB mounts are active when that machine is booted into Windows.
+# nofail ensures a failed mount does not block boot or the automount unit.
+# See section 3b for the complementary NFS mounts used when locus (Linux)
+# is running instead.
 # =============================================================================
 - name: Install cifs-utils
   community.general.pacman:
@@ -207,7 +223,7 @@
     mode: '0644'
     content: |
       [Unit]
-      Description=Mount Main PC {{ item }} drive
+      Description=Mount Main PC {{ item }} drive (SMB)
       After=network-online.target
       Wants=network-online.target
 
@@ -215,7 +231,7 @@
       What=//{{ mainpc_smb_host }}/{{ item }}
       Where=/mnt/mainpc/{{ item | lower }}
       Type=cifs
-      Options=credentials=/etc/samba/mainpc.creds,uid={{ user_name }},gid={{ user_name }},iocharset=utf8,vers=3.0
+      Options=credentials=/etc/samba/mainpc.creds,uid={{ user_name }},gid={{ user_name }},iocharset=utf8,vers=3.0,nofail
 
       [Install]
       WantedBy=multi-user.target
@@ -229,7 +245,7 @@
     mode: '0644'
     content: |
       [Unit]
-      Description=Automount Main PC {{ item }} drive
+      Description=Automount Main PC {{ item }} drive (SMB)
       After=network-online.target
 
       [Automount]
@@ -257,9 +273,16 @@
 # Linux, locus exports its data partitions over NFS so tabula can reach the
 # same data regardless of which OS is running on that machine.
 #
-# NFS uses host-based auth: access is granted because the request comes from
-# tabula.local on the trusted home LAN — no credentials needed.
-# Mount prefix /mnt/locus/ avoids collision with /mnt/mainpc/.
+# Design: locus/mainpc are mutually exclusive — only one is up at a time.
+#   - locus (Linux):   /mnt/locus/*   NFS mounts are live; /mnt/mainpc/* offline.
+#   - mainpc (Windows): /mnt/mainpc/* SMB mounts are live; /mnt/locus/* offline.
+# Both sets are always deployed as automounts with nofail so each fails
+# gracefully when the peer is unreachable.  Access whichever tree corresponds
+# to the OS currently running on that hardware.
+#
+# soft+timeo+retrans: a failed NFS access returns EIO quickly rather than
+#   blocking indefinitely as hard-mount would when the server is unreachable.
+# nofail: mount failure does not propagate unit failure or block boot.
 #
 # Replace with SSHFS over Tailscale when Pi/VPN is deployed.
 # =============================================================================
@@ -275,7 +298,7 @@
     state: directory
     owner: root
     mode: '0755'
-  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  loop: "{{ locus_nfs_shares }}"
   when: global_is_laptop | default(false)
 
 - name: Deploy systemd NFS mount units for locus shares
@@ -293,11 +316,11 @@
       What=locus.local:/mnt/{{ item }}
       Where=/mnt/locus/{{ item }}
       Type=nfs
-      Options=rw,hard,_netdev,nofail
+      Options=rw,soft,timeo=30,retrans=2,_netdev,nofail
 
       [Install]
       WantedBy=multi-user.target
-  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  loop: "{{ locus_nfs_shares }}"
   when: global_is_laptop | default(false)
 
 - name: Deploy systemd automount units for locus NFS shares
@@ -316,7 +339,7 @@
 
       [Install]
       WantedBy=multi-user.target
-  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  loop: "{{ locus_nfs_shares }}"
   when: global_is_laptop | default(false)
 
 - name: Enable and start automount units for locus NFS shares
@@ -325,20 +348,15 @@
     enabled: true
     state: started
     daemon_reload: true
-  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  loop: "{{ locus_nfs_shares }}"
   when: global_is_laptop | default(false)
 
 # =============================================================================
 # 4. Seedbox SSH Key & SSHFS Mount
 # =============================================================================
-- name: Ensure .ssh directory exists
-  ansible.builtin.file:
-    path: "/home/{{ user_name }}/.ssh"
-    state: directory
-    owner: "{{ user_name }}"
-    mode: '0700'
-  become: false
-  when: remote_access_has_ssh_key
+
+# NOTE: .ssh directory is created unconditionally in section 0b above.
+# No duplicate mkdir here.
 
 - name: Deploy SSH private key
   ansible.builtin.copy:
@@ -509,5 +527,3 @@
   when:
     - global_is_desktop | default(false)
     - remote_access_local_key_stat.stat.exists
-
-
