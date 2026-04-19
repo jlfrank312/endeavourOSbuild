@@ -527,3 +527,16 @@
   when:
     - global_is_desktop | default(false)
     - remote_access_local_key_stat.stat.exists
+
+- name: Deploy locus connection script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.local/bin/locus"
+    owner: "{{ user_name }}"
+    mode: '0700'
+    content: |
+      #!/bin/bash
+      ssh locus
+  become: false
+  when:
+    - global_is_laptop | default(false)
+    - remote_access_local_key_stat.stat.exists
