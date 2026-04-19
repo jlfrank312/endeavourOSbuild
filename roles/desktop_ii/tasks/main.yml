@@ -45,6 +45,7 @@
       # Intel GPU Wayland environment variables
       # Managed by Ansible - do not edit manually
       env = LIBVA_DRIVER_NAME,iHD
+  become: false
   when: global_has_intel_gpu | default(false)
 
 - name: Ensure hyprland.conf sources Intel env file
@@ -52,6 +53,7 @@
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/custom/intel-env.conf"
     state: present
+  become: false
   when: global_has_intel_gpu | default(false)
 
 # =============================================================================
@@ -70,6 +72,7 @@
       env = GBM_BACKEND,nvidia-drm
       env = __GLX_VENDOR_LIBRARY_NAME,nvidia
       env = NVD_BACKEND,direct
+  become: false
   when: global_has_nvidia_gpu | default(false)
 
 - name: Ensure hyprland.conf sources NVIDIA env file
@@ -77,6 +80,7 @@
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/custom/nvidia-env.conf"
     state: present
+  become: false
   when: global_has_nvidia_gpu | default(false)
 
 # =============================================================================
@@ -89,6 +93,7 @@
     dest: "/home/{{ user_name }}/.config/hypr/custom/input.conf"
     owner: "{{ user_name }}"
     mode: '0644'
+  become: false
   when:
     - global_is_laptop | default(false)
     - lookup('fileglob', playbook_dir + '/dotfiles/' + ansible_facts['hostname'] + '/.config/hypr/custom/input.conf') | length > 0
@@ -98,6 +103,7 @@
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/custom/input.conf"
     state: present
+  become: false
   when: global_is_laptop | default(false)
 
 # =============================================================================
@@ -109,12 +115,14 @@
     dest: "/home/{{ user_name }}/.config/hypr/custom/display.conf"
     owner: "{{ user_name }}"
     mode: '0644'
+  become: false
 
 - name: Ensure hyprland.conf sources display config
   ansible.builtin.lineinfile:
     path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
     line: "source = ~/.config/hypr/custom/display.conf"
     state: present
+  become: false
 
 # =============================================================================
 # 3-W. Wallpaper Deployment
@@ -125,6 +133,7 @@
     state: directory
     owner: "{{ user_name }}"
     mode: '0755'
+  become: false
 
 - name: Deploy wallpapers
   ansible.builtin.copy:
@@ -132,6 +141,7 @@
     dest: "/home/{{ user_name }}/Pictures/Wallpapers/"
     owner: "{{ user_name }}"
     mode: '0644'
+  become: false
   when: lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts['hostname'] + '/*') | length > 0
 
 # =============================================================================
@@ -267,7 +277,7 @@
     sleep 2
     colormgr device-add-profile xrandr-eDP-1 icc-74249ceae37cdad58cc5066c2234be54
     colormgr device-make-profile-default xrandr-eDP-1 icc-74249ceae37cdad58cc5066c2234be54
-  become: false
+  become: true
   changed_when: true
   when: global_is_laptop | default(false)
 
