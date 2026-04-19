@@ -12,14 +12,14 @@
 
 - name: Check whether alter is currently mounted
   ansible.builtin.command: mountpoint -q /mnt/alter
-  register: alter_mountpoint_check
+  register: main_pc_alter_mountpoint_check
   changed_when: false
   failed_when: false
   become: false
 
 - name: Set global_alter_mounted fact # noqa: var-naming
   ansible.builtin.set_fact:
-    global_alter_mounted: "{{ alter_mountpoint_check.rc == 0 }}"
+    global_alter_mounted: "{{ main_pc_alter_mountpoint_check.rc == 0 }}"
   become: false
 
 # =============================================================================
@@ -167,9 +167,7 @@
     - Backups
     - Clutter
     - System
-  when:
-  - global_alter_uuid_set
-  - global_alter_mounted
+  when: global_alter_mounted
 
 # =============================================================================
 # 5. Home Directory Symlinks → alter
@@ -188,9 +186,7 @@
     - Projects
     - Games
     - Clutter
-  when:
-  - global_alter_uuid_set
-  - global_alter_mounted
+  when: global_alter_mounted
 
 - name: Create home directory symlinks to alter
   ansible.builtin.file:
@@ -208,9 +204,7 @@
     - Projects
     - Games
     - Clutter
-  when:
-  - global_alter_uuid_set
-  - global_alter_mounted
+  when: global_alter_mounted
 
 # =============================================================================
 # OS Prober (Windows dual-boot detection)

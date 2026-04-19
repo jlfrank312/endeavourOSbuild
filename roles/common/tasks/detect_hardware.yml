@@ -75,6 +75,11 @@
          'movbe' in (common_cpuinfo_output.stdout | default('')) and
          'xsave' in (common_cpuinfo_output.stdout | default('')) }}
 
+- name: Initialise machine-specific partition facts # noqa: var-naming
+  ansible.builtin.set_fact:
+    global_alter_mounted: false
+    global_alter_uuid_set: false
+
 # =============================================================================
 # Dynamic Group Assignments
 # =============================================================================
