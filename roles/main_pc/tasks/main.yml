@@ -1,5 +1,28 @@
 ---
 # =============================================================================
+# 0. Alter Partition — Configuration & Mount Status
+# =============================================================================
+# global_ variables explicitly designated for cross-role usage throughout playbook
+- name: Check whether alter UUID is configured # noqa: var-naming
+  ansible.builtin.set_fact:
+    global_alter_uuid_set: >-
+      {{ (data_mounts | selectattr('name', 'equalto', 'alter')
+         | list | map(attribute='uuid') | first | default('')) | length > 0 }}
+  become: false
+
+- name: Check whether alter is currently mounted
+  ansible.builtin.command: mountpoint -q /mnt/alter
+  register: alter_mountpoint_check
+  changed_when: false
+  failed_when: false
+  become: false
+
+- name: Set global_alter_mounted fact # noqa: var-naming
+  ansible.builtin.set_fact:
+    global_alter_mounted: "{{ alter_mountpoint_check.rc == 0 }}"
+  become: false
+
+# =============================================================================
 # 1. Mount Point Creation
 # =============================================================================
 - name: Create data mount point directories
@@ -144,9 +167,9 @@
     - Backups
     - Clutter
     - System
-  when: >
-    (data_mounts | selectattr('name', 'equalto', 'alter') | first).uuid
-    | default('') | length > 0
+  when:
+  - global_alter_uuid_set
+  - global_alter_mounted
 
 # =============================================================================
 # 5. Home Directory Symlinks → alter
@@ -165,9 +188,9 @@
     - Projects
     - Games
     - Clutter
-  when: >
-    (data_mounts | selectattr('name', 'equalto', 'alter') | first).uuid
-    | default('') | length > 0
+  when:
+  - global_alter_uuid_set
+  - global_alter_mounted
 
 - name: Create home directory symlinks to alter
   ansible.builtin.file:
@@ -185,9 +208,9 @@
     - Projects
     - Games
     - Clutter
-  when: >
-    (data_mounts | selectattr('name', 'equalto', 'alter') | first).uuid
-    | default('') | length > 0
+  when:
+  - global_alter_uuid_set
+  - global_alter_mounted
 
 # =============================================================================
 # OS Prober (Windows dual-boot detection)
