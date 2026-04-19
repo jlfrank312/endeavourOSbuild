@@ -68,6 +68,7 @@
       when:
         - global_has_nvidia_gpu | default(false)
         - global_is_desktop | default(false)
+        - global_alter_mounted | default(false)
 
     - role: pi_services
       when: global_is_arm | default(false)
