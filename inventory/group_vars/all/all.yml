@@ -20,7 +20,12 @@ mainpc_smb_password: "{{ vault_mainpc_smb_password }}"
 
 mainpc_smb_shares: "{{ vault_mainpc_smb_shares }}"
 
-ssh_private_key: "{{ lookup('vars', 'vault_' + ansible_facts['hostname'] + '_ssh_private_key') }}"
+# Resolved per-host from vault.  Hosts that manage their own keypair
+# (desktop keygen in remote_access section 0c) will not have a vault entry;
+# the default('') prevents a hard error on those hosts, and the
+# remote_access_has_ssh_key guard ensures the var is only used when a
+# non-empty pubkey exists in dotfiles.
+ssh_private_key: "{{ lookup('vars', 'vault_' + ansible_facts['hostname'] + '_ssh_private_key', default='') }}"
 
 seedbox_host: "{{ vault_seedbox_host }}"
 
@@ -29,3 +34,35 @@ seedbox_user: "{{ vault_seedbox_user }}"
 seedbox_name: "{{ vault_seedbox_name }}"
 
 fwupd_bios_guid: "{{ lookup('vars', 'vault_' + ansible_facts['hostname'] + '_fwupd_bios_guid', default='') }}"
+
+# =============================================================================
+# Locus / NFS
+#
+# Names of the data partitions locus exports over NFS and tabula mounts.
+# Values must match the data_mounts names in host_vars/main-pc.yml (they
+# map to /mnt/<name> on locus, which is what gets exported).
+#
+# Kept here rather than in host_vars/main-pc.yml so that roles running on
+# tabula (remote_access) and templates running on locus (nfs-exports.j2)
+# both reference the same definition without a cross-host hostvars lookup.
+# =============================================================================
+locus_nfs_shares:
+  - alter
+  - lily
+  - mordred
+  - nero
+
+# NFS export client identifier used in /etc/exports on locus.
+#
+# IMPORTANT — kernel-level resolution caveat:
+#   The Linux NFS server checks client access at the kernel level, which does
+#   NOT go through userspace NSS / avahi / mDNS.  Using a .local mDNS name
+#   here works only when nss-mdns resolves it at exportfs parse time and the
+#   result is cached — which is not guaranteed across reboots.
+#
+#   For maximum reliability use one of:
+#     a) A static IP:   locus_nfs_client_host: 192.168.1.x
+#     b) A /24 subnet:  locus_nfs_client_host: 192.168.1.0/24
+#   Both are safe on a trusted home LAN.  Option (a) requires a DHCP
+#   reservation for tabula; option (b) trusts the whole subnet.
+locus_nfs_client_host: tabula.local

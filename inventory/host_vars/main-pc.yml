@@ -17,6 +17,19 @@ monitor_primary_hdr: true
 
 nvidia_use_open_modules: true
 
+# nvidia_use_dkms: override DKMS auto-detection for the open driver variant.
+#
+# Auto-detection (default, omit this var): use DKMS if no prebuilt module
+# exists for the running kernel; use prebuilt otherwise.
+#
+# Set true  → always install nvidia-open-dkms (safe choice on CachyOS;
+#              compiles against the running kernel at install time).
+# Set false → always install nvidia-open prebuilt (only use if you have
+#              confirmed the prebuilt matches your current kernel).
+#
+# Uncomment to override:
+# nvidia_use_dkms: true
+
 # =============================================================================
 # Data Partition Mounts
 # UUIDs are vaulted. Populate vault after install with: lsblk -f
@@ -49,3 +62,7 @@ data_mounts:
 
 # Arturia is separate: read-only Windows C, on-demand automount with idle timeout.
 arturia_uuid: "{{ vault_locus_arturia_uuid }}"
+
+# NFS share list moved to group_vars/all/all.yml (locus_nfs_shares).
+# Defined there so both nfs-exports.j2 (on locus) and remote_access (on tabula)
+# share the same definition without a cross-host hostvars lookup.

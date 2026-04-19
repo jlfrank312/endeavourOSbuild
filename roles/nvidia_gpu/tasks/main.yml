@@ -1,15 +1,92 @@
 ---
 # =============================================================================
-# 1a. Driver Installation (Open Kernel Modules — Turing/Ampere/Ada/Hopper+)
+# 0. DKMS Auto-detection
+#
+# nvidia-open (prebuilt) requires the running kernel to exactly match what
+# NVIDIA compiled against.  On CachyOS this often fails because the custom
+# kernel lags the official prebuilt release — or vice versa — causing an
+# "incompatible module" boot failure.  nvidia-open-dkms compiles at install
+# time against whatever kernel is running, so it always matches.
+#
+# Detection logic (applied only when open modules are selected):
+#   1. Check if a prebuilt nvidia-open module exists for the running kernel.
+#   2. If yes  → prebuilt is safe to use (unless nvidia_use_dkms is forced).
+#   3. If no   → fall back to DKMS automatically.
+#
+# Override: set nvidia_use_dkms: true in host_vars to force DKMS regardless.
+#           Set nvidia_use_dkms: false to force prebuilt (not recommended on
+#           CachyOS unless you have confirmed a matching prebuilt is available).
+#           Omit the var entirely to let auto-detection decide.
 # =============================================================================
-- name: Remove conflicting pre-built nvidia-open-dkms if present
+- name: Detect running kernel version
+  ansible.builtin.command: uname -r
+  register: nvidia_kernel_version
+  changed_when: false
+  when: nvidia_use_open_modules | default(true)
+
+- name: Check if prebuilt nvidia-open module exists for running kernel
+  ansible.builtin.stat:
+    path: "/usr/lib/modules/{{ nvidia_kernel_version.stdout }}/extramodules/nvidia.ko.zst"
+  register: nvidia_prebuilt_module_stat
+  when: nvidia_use_open_modules | default(true)
+
+# nvidia_use_dkms from host_vars is an explicit override.
+# When absent, auto-detect: use DKMS if no matching prebuilt module was found.
+- name: Resolve effective DKMS flag
+  ansible.builtin.set_fact:
+    nvidia_effective_use_dkms: >-
+      {{ nvidia_use_dkms
+         | default(not (nvidia_prebuilt_module_stat.stat.exists | default(false))) }}
+  when: nvidia_use_open_modules | default(true)
+
+- name: Report resolved driver variant
+  ansible.builtin.debug:
+    msg: >-
+      nvidia_gpu: open modules selected,
+      variant={{ 'dkms' if nvidia_effective_use_dkms else 'prebuilt' }},
+      auto-detected={{ nvidia_use_dkms is not defined }},
+      prebuilt_module_present={{ nvidia_prebuilt_module_stat.stat.exists | default(false) }}
+  when: nvidia_use_open_modules | default(true)
+
+# =============================================================================
+# 1a. Driver Installation (Open Kernel Modules — Turing/Ampere/Ada/Hopper+)
+#
+# Two mutually exclusive variants: prebuilt (nvidia-open) or DKMS
+# (nvidia-open-dkms).  Remove whichever variant is NOT being installed to
+# prevent conflicts, then install the chosen one.
+# =============================================================================
+- name: Remove prebuilt nvidia-open (switching to or staying on DKMS variant)
+  community.general.pacman:
+    name: nvidia-open
+    state: absent
+  failed_when: false
+  when:
+    - nvidia_use_open_modules | default(true)
+    - nvidia_effective_use_dkms
+
+- name: Install NVIDIA open kernel modules — DKMS variant (compiles against running kernel)
+  community.general.pacman:
+    name:
+      - egl-gbm
+      - egl-wayland
+      - nvidia-open-dkms
+      - nvidia-utils
+      - lib32-nvidia-utils
+    state: present
+  when:
+    - nvidia_use_open_modules | default(true)
+    - nvidia_effective_use_dkms
+
+- name: Remove nvidia-open-dkms (switching to or staying on prebuilt variant)
   community.general.pacman:
     name: nvidia-open-dkms
     state: absent
   failed_when: false
-  when: nvidia_use_open_modules | default(true)
+  when:
+    - nvidia_use_open_modules | default(true)
+    - not nvidia_effective_use_dkms
 
-- name: Install NVIDIA open kernel modules (Turing and newer)
+- name: Install NVIDIA open kernel modules — prebuilt variant
   community.general.pacman:
     name:
       - egl-gbm
@@ -18,14 +95,21 @@
       - nvidia-utils
       - lib32-nvidia-utils
     state: present
-  when: nvidia_use_open_modules | default(true)
+  when:
+    - nvidia_use_open_modules | default(true)
+    - not nvidia_effective_use_dkms
 
 # =============================================================================
 # 1b. Driver Installation (Proprietary — legacy 580xx stack)
+#
+# For pre-Turing GPUs that do not support the open kernel modules.
+# Remove both open variants first to ensure a clean state.
 # =============================================================================
-- name: Remove conflicting pre-built nvidia-open if present
+- name: Remove open module packages (switching to legacy proprietary stack)
   community.general.pacman:
-    name: nvidia-open
+    name:
+      - nvidia-open
+      - nvidia-open-dkms
     state: absent
   failed_when: false
   when: not (nvidia_use_open_modules | default(true))
@@ -48,7 +132,7 @@
   ansible.builtin.lineinfile:
     path: /etc/default/grub
     regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
-    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet nvidia-drm.modeset=1 nvidia_drm.fbdev=1"'
+    line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet nvidia-drm.modeset=1 nvidia-drm.fbdev=1"'
     backup: true
   notify: Regenerate GRUB
   when: >

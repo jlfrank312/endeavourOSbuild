@@ -215,6 +215,59 @@
   when: global_alter_mounted
 
 # =============================================================================
+# NFS Server
+#
+# Exports the data partition mount points to tabula over NFS.
+# Host-based auth is appropriate here: both machines are always on the same
+# trusted home LAN.  Revisit when Tailscale/Pi is deployed; at that point
+# these mounts will be replaced by SSHFS over Tailscale.
+#
+# UIDs must match between locus and tabula (they will: Ansible creates the
+# same user on both machines).
+# =============================================================================
+- name: Install nfs-utils
+  community.general.pacman:
+    name: nfs-utils
+    state: present
+
+- name: Deploy NFS exports
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/nfs-exports.j2"
+    dest: /etc/exports
+    owner: root
+    mode: '0644'
+  notify: Reload NFS exports
+
+- name: Enable and start nfs-server
+  ansible.builtin.systemd:
+    name: nfs-server
+    enabled: true
+    state: started
+
+# =============================================================================
+# Realtek r8168 NIC Driver
+#
+# r8168-dkms provides a more stable and feature-complete driver for
+# RTL8168/8111 Gigabit NICs than the in-kernel r8169 module.
+# Blacklisting r8169 prevents it from loading at boot and claiming the device
+# before r8168 can.  The blacklist takes effect on the next reboot.
+# =============================================================================
+- name: Install r8168-dkms (Realtek RTL8168/8111 driver)
+  community.general.pacman:
+    name: r8168-dkms
+    state: present
+
+- name: Blacklist r8169 kernel module
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/blacklist-r8169.conf
+    content: |
+      # Blacklist r8169 so r8168-dkms claims the RTL8168/8111 NIC at boot.
+      # Deployed by the main_pc role.
+      blacklist r8169
+    owner: root
+    mode: '0644'
+
+# =============================================================================
 # OS Prober (Windows dual-boot detection)
 # =============================================================================
 - name: Install os-prober

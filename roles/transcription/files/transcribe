@@ -22,10 +22,28 @@ Examples:
   transcribe film.mp4 --language ja
 """
 
-import argparse
 import os
-import subprocess
 import sys
+
+# ---------------------------------------------------------------------------
+# CUDA compatibility shim — must execute before ctranslate2 is imported.
+#
+# ctranslate2 may have CUDA 12 library paths hard-coded while CachyOS ships
+# CUDA 13.  If /opt/cuda/targets/x86_64-linux/lib is absent from
+# LD_LIBRARY_PATH, prepend it and re-exec so the dynamic linker resolves
+# libcuda from the correct tree on the very first shared-library load.
+# Becomes a no-op once ctranslate2 ships native CUDA 13 support.
+# ---------------------------------------------------------------------------
+_CUDA_COMPAT = "/opt/cuda/targets/x86_64-linux/lib"
+if os.path.isdir(_CUDA_COMPAT) and _CUDA_COMPAT not in os.environ.get("LD_LIBRARY_PATH", "").split(":"):
+    os.environ["LD_LIBRARY_PATH"] = ":".join(
+        filter(None, [_CUDA_COMPAT, os.environ.get("LD_LIBRARY_PATH", "")])
+    )
+    os.execv(sys.executable, [sys.executable] + sys.argv)
+del _CUDA_COMPAT
+
+import argparse
+import subprocess
 import tempfile
 from pathlib import Path
 

@@ -3,3 +3,7 @@
   ansible.builtin.command:
     cmd: grub-mkconfig -o /boot/grub/grub.cfg
   become: true
+
+- name: Reload NFS exports
+  ansible.builtin.command: exportfs -ra
+  become: true

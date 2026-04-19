@@ -19,9 +19,11 @@
 # =============================================================================
 # 1. System Dependencies
 # =============================================================================
-- name: Install ffmpeg
+- name: Install system dependencies
   community.general.pacman:
-    name: ffmpeg
+    name:
+      - ffmpeg
+      - cuda    # required by ctranslate2 for GPU inference
     state: present
  
 # =============================================================================
@@ -46,6 +48,53 @@
   become_user: "{{ user_name }}"
   when: global_alter_mounted | default(false)
  
+# =============================================================================
+# 2b. CUDA Compatibility Workaround (alter-gated, self-healing)
+#
+# CachyOS ships CUDA 13 while ctranslate2 has CUDA 12 lib paths hard-coded.
+# Fix: prepend /opt/cuda/targets/x86_64-linux/lib to LD_LIBRARY_PATH.
+#
+# Detection: try importing ctranslate2 with a clean LD_LIBRARY_PATH.
+# If import fails → deploy the fish conf.d shim.
+# If import succeeds → remove the shim (auto-heals once ct2 supports CUDA 13).
+# The transcribe script applies the same logic at runtime via os.execv re-exec.
+# =============================================================================
+- name: Check if ctranslate2 imports cleanly without CUDA path override
+  ansible.builtin.command:
+    argv:
+      - /mnt/alter/Models/whisper/venv/bin/python
+      - -c
+      - "import ctranslate2"
+  register: transcription_ct2_native_check
+  changed_when: false
+  failed_when: false
+  become: true
+  become_user: "{{ user_name }}"
+  environment:
+    LD_LIBRARY_PATH: ""
+  when: global_alter_mounted | default(false)
+
+- name: Deploy fish CUDA path shim (ctranslate2 cannot find CUDA 13 libs natively)
+  ansible.builtin.copy:
+    dest: /etc/fish/conf.d/cuda.conf
+    content: |
+      # ctranslate2 CUDA compatibility shim — auto-removed once ct2 ships CUDA 13 support.
+      # Deployed by the transcription role when ctranslate2 fails to import without this path.
+      set -x LD_LIBRARY_PATH /opt/cuda/targets/x86_64-linux/lib $LD_LIBRARY_PATH
+    owner: root
+    mode: '0644'
+  when:
+    - global_alter_mounted | default(false)
+    - transcription_ct2_native_check.rc != 0
+
+- name: Remove fish CUDA path shim (ctranslate2 finds CUDA libraries natively)
+  ansible.builtin.file:
+    path: /etc/fish/conf.d/cuda.conf
+    state: absent
+  when:
+    - global_alter_mounted | default(false)
+    - transcription_ct2_native_check.rc == 0
+
 # =============================================================================
 # 3. Model Pre-download (alter-gated)
 #

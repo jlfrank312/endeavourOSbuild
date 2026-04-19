@@ -9,9 +9,113 @@
   delegate_to: localhost
   become: false
 
+# Guard requires both file existence AND non-zero size.
+# A zero-byte placeholder (committed before first-run keygen) must not be
+# treated as a deployable key — it would trigger the vault lookup and the
+# seedbox/SSHFS tasks against an absent vault variable.
 - name: Set SSH key availability fact
   ansible.builtin.set_fact:
-    remote_access_has_ssh_key: "{{ remote_access_ssh_pubkey_stat.stat.exists }}"
+    remote_access_has_ssh_key: >-
+      {{ remote_access_ssh_pubkey_stat.stat.exists and
+         (remote_access_ssh_pubkey_stat.stat.size | default(0)) > 0 }}
+
+# =============================================================================
+# 0a. SSH Server
+#
+# Enable sshd on all desktop and laptop hosts so they can accept inbound
+# connections from peers (e.g. tabula → locus).
+# =============================================================================
+- name: Install OpenSSH
+  community.general.pacman:
+    name: openssh
+    state: present
+  when: global_is_desktop | default(false) or global_is_laptop | default(false)
+
+- name: Enable and start sshd
+  ansible.builtin.systemd:
+    name: sshd
+    enabled: true
+    state: started
+  when: global_is_desktop | default(false) or global_is_laptop | default(false)
+
+# =============================================================================
+# 0b. Cross-host Authorized Keys
+#
+# Any host whose public key has been committed to dotfiles/<host>/.ssh/
+# is automatically authorized on all other managed hosts.
+# Workflow for a new host:
+#   1. Run playbook → section 0c generates a keypair and prints the pubkey.
+#   2. Commit the pubkey to dotfiles/<hostname>/.ssh/id_ed25519.pub.
+#   3. Re-run the playbook → this task distributes it to all peers.
+#
+# Zero-byte placeholder files (committed before step 2) are filtered out
+# so that the authorized_key module never receives an empty key string.
+# =============================================================================
+- name: Ensure .ssh directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.ssh"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0700'
+  become: false
+
+- name: Authorize peer SSH public keys
+  ansible.posix.authorized_key:
+    user: "{{ user_name }}"
+    state: present
+    key: "{{ lookup('file', item) }}"
+  loop: >-
+    {{ query('fileglob', playbook_dir + '/dotfiles/*/.ssh/id_ed25519.pub')
+       | reject('search', '/' + ansible_facts['hostname'] + '/')
+       | list }}
+  when: lookup('file', item) | trim | length > 0
+  become: false
+
+# =============================================================================
+# 0c. SSH Keypair Generation (desktop hosts only)
+#
+# If no keypair has been committed to dotfiles for this host, generate one
+# on the machine itself.  The private key never leaves the host.  The printed
+# pubkey must be committed to dotfiles/<hostname>/.ssh/id_ed25519.pub and the
+# playbook re-run so peers can authorize it (section 0b above).
+# =============================================================================
+- name: Check if SSH private key already exists on this host
+  ansible.builtin.stat:
+    path: "/home/{{ user_name }}/.ssh/id_ed25519"
+  register: remote_access_privkey_stat
+  become: false
+
+- name: Generate SSH keypair if not present (desktop hosts)
+  ansible.builtin.command:
+    cmd: "ssh-keygen -t ed25519 -N '' -f /home/{{ user_name }}/.ssh/id_ed25519"
+    creates: "/home/{{ user_name }}/.ssh/id_ed25519"
+  become: true
+  become_user: "{{ user_name }}"
+  when:
+    - global_is_desktop | default(false)
+    - not remote_access_privkey_stat.stat.exists
+  register: remote_access_keypair_generation
+
+- name: Read generated public key for operator reference
+  ansible.builtin.slurp:
+    src: "/home/{{ user_name }}/.ssh/id_ed25519.pub"
+  register: remote_access_generated_pubkey_slurp
+  when:
+    - remote_access_keypair_generation is defined
+    - remote_access_keypair_generation is changed
+
+- name: Remind operator to commit generated pubkey to dotfiles
+  ansible.builtin.debug:
+    msg: |
+      *** New SSH keypair generated on {{ ansible_facts['hostname'] }}.
+          Commit the public key to the repo at:
+            dotfiles/{{ ansible_facts['hostname'] }}/.ssh/id_ed25519.pub
+          then re-run the playbook so peer hosts will authorize it.
+
+          {{ remote_access_generated_pubkey_slurp.content | b64decode | trim }}
+  when:
+    - remote_access_keypair_generation is defined
+    - remote_access_keypair_generation is changed
 
 # =============================================================================
 # 1. FreeRDP
@@ -70,7 +174,13 @@
   when: global_is_laptop | default(false)
 
 # =============================================================================
-# 3. Main PC SMB Shares
+# 3. Main PC SMB Shares (tabula only)
+#
+# mainpc is the Windows identity of the same hardware as locus.
+# These SMB mounts are active when that machine is booted into Windows.
+# nofail ensures a failed mount does not block boot or the automount unit.
+# See section 3b for the complementary NFS mounts used when locus (Linux)
+# is running instead.
 # =============================================================================
 - name: Install cifs-utils
   community.general.pacman:
@@ -113,7 +223,7 @@
     mode: '0644'
     content: |
       [Unit]
-      Description=Mount Main PC {{ item }} drive
+      Description=Mount Main PC {{ item }} drive (SMB)
       After=network-online.target
       Wants=network-online.target
 
@@ -121,7 +231,7 @@
       What=//{{ mainpc_smb_host }}/{{ item }}
       Where=/mnt/mainpc/{{ item | lower }}
       Type=cifs
-      Options=credentials=/etc/samba/mainpc.creds,uid={{ user_name }},gid={{ user_name }},iocharset=utf8,vers=3.0
+      Options=credentials=/etc/samba/mainpc.creds,uid={{ user_name }},gid={{ user_name }},iocharset=utf8,vers=3.0,nofail
 
       [Install]
       WantedBy=multi-user.target
@@ -135,7 +245,7 @@
     mode: '0644'
     content: |
       [Unit]
-      Description=Automount Main PC {{ item }} drive
+      Description=Automount Main PC {{ item }} drive (SMB)
       After=network-online.target
 
       [Automount]
@@ -157,16 +267,96 @@
   when: global_is_laptop | default(false)
 
 # =============================================================================
+# 3b. Locus NFS Shares (tabula only)
+#
+# locus is the Linux identity of the same machine as mainpc.  When booted into
+# Linux, locus exports its data partitions over NFS so tabula can reach the
+# same data regardless of which OS is running on that machine.
+#
+# Design: locus/mainpc are mutually exclusive — only one is up at a time.
+#   - locus (Linux):   /mnt/locus/*   NFS mounts are live; /mnt/mainpc/* offline.
+#   - mainpc (Windows): /mnt/mainpc/* SMB mounts are live; /mnt/locus/* offline.
+# Both sets are always deployed as automounts with nofail so each fails
+# gracefully when the peer is unreachable.  Access whichever tree corresponds
+# to the OS currently running on that hardware.
+#
+# soft+timeo+retrans: a failed NFS access returns EIO quickly rather than
+#   blocking indefinitely as hard-mount would when the server is unreachable.
+# nofail: mount failure does not propagate unit failure or block boot.
+#
+# Replace with SSHFS over Tailscale when Pi/VPN is deployed.
+# =============================================================================
+- name: Install nfs-utils (NFS client)
+  community.general.pacman:
+    name: nfs-utils
+    state: present
+  when: global_is_laptop | default(false)
+
+- name: Create mount point directories for locus NFS shares
+  ansible.builtin.file:
+    path: "/mnt/locus/{{ item }}"
+    state: directory
+    owner: root
+    mode: '0755'
+  loop: "{{ locus_nfs_shares }}"
+  when: global_is_laptop | default(false)
+
+- name: Deploy systemd NFS mount units for locus shares
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-locus-{{ item }}.mount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount Locus {{ item }} share (NFS)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Mount]
+      What=locus.local:/mnt/{{ item }}
+      Where=/mnt/locus/{{ item }}
+      Type=nfs
+      Options=rw,soft,timeo=30,retrans=2,_netdev,nofail
+
+      [Install]
+      WantedBy=multi-user.target
+  loop: "{{ locus_nfs_shares }}"
+  when: global_is_laptop | default(false)
+
+- name: Deploy systemd automount units for locus NFS shares
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-locus-{{ item }}.automount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Automount Locus {{ item }} share (NFS)
+      After=network-online.target
+
+      [Automount]
+      Where=/mnt/locus/{{ item }}
+      TimeoutIdleSec=300
+
+      [Install]
+      WantedBy=multi-user.target
+  loop: "{{ locus_nfs_shares }}"
+  when: global_is_laptop | default(false)
+
+- name: Enable and start automount units for locus NFS shares
+  ansible.builtin.systemd:
+    name: "mnt-locus-{{ item }}.automount"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ locus_nfs_shares }}"
+  when: global_is_laptop | default(false)
+
+# =============================================================================
 # 4. Seedbox SSH Key & SSHFS Mount
 # =============================================================================
-- name: Ensure .ssh directory exists
-  ansible.builtin.file:
-    path: "/home/{{ user_name }}/.ssh"
-    state: directory
-    owner: "{{ user_name }}"
-    mode: '0700'
-  become: false
-  when: remote_access_has_ssh_key
+
+# NOTE: .ssh directory is created unconditionally in section 0b above.
+# No duplicate mkdir here.
 
 - name: Deploy SSH private key
   ansible.builtin.copy:
@@ -200,16 +390,30 @@
     mode: '0755'
   when: remote_access_has_ssh_key
 
-- name: Deploy seedbox SSH config
-  ansible.builtin.copy:
-    dest: "/home/{{ user_name }}/.ssh/config"
+# SSH config uses blockinfile so multiple host stanzas can coexist without
+# overwriting each other.  Each stanza is independently idempotent.
+- name: Ensure SSH config file exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.ssh/config"
+    state: touch
     owner: "{{ user_name }}"
     mode: '0600'
-    content: |
+    modification_time: preserve
+    access_time: preserve
+  become: false
+
+- name: Add seedbox entry to SSH config
+  ansible.builtin.blockinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ seedbox_name }}"
+    block: |
       Host {{ seedbox_name }}
           HostName {{ seedbox_host }}
           User {{ seedbox_user }}
           IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
   become: false
   when: remote_access_has_ssh_key
 
@@ -276,3 +480,63 @@
     state: started
     daemon_reload: true
   when: remote_access_has_ssh_key
+
+# =============================================================================
+# 5. Local Peer SSH Config (locus ↔ tabula)
+#
+# Adds SSH host stanzas so machines on the LAN can reach each other by name
+# without password prompts.  Gated on the host having a keypair (deployed
+# from dotfiles or freshly generated in section 0c).
+# =============================================================================
+- name: Check if SSH key exists (deployed or generated)
+  ansible.builtin.stat:
+    path: "/home/{{ user_name }}/.ssh/id_ed25519"
+  register: remote_access_local_key_stat
+  become: false
+
+- name: Add locus entry to SSH config (on tabula)
+  ansible.builtin.blockinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - locus"
+    block: |
+      Host locus
+          HostName locus.local
+          User {{ user_name }}
+          IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
+  become: false
+  when:
+    - global_is_laptop | default(false)
+    - remote_access_local_key_stat.stat.exists
+
+- name: Add tabula entry to SSH config (on locus)
+  ansible.builtin.blockinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - tabula"
+    block: |
+      Host tabula
+          HostName tabula.local
+          User {{ user_name }}
+          IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
+  become: false
+  when:
+    - global_is_desktop | default(false)
+    - remote_access_local_key_stat.stat.exists
+
+- name: Deploy locus connection script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.local/bin/locus"
+    owner: "{{ user_name }}"
+    mode: '0700'
+    content: |
+      #!/bin/bash
+      ssh locus
+  become: false
+  when:
+    - global_is_laptop | default(false)
+    - remote_access_local_key_stat.stat.exists
