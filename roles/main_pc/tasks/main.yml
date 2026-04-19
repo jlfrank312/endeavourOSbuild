@@ -27,11 +27,13 @@
 - name: Deploy data partition mount units
   ansible.builtin.template:
     src: "{{ playbook_dir }}/templates/systemd-data-mount.conf.j2"
-    dest: "/etc/systemd/system/mnt-{{ item.name }}.mount"
+    dest: "/etc/systemd/system/mnt-{{ mount.name }}.mount"
     owner: root
     mode: '0644'
   loop: "{{ data_mounts }}"
-  when: item.uuid | default('') | length > 0
+  loop_control:
+    loop_var: mount
+  when: mount.uuid | default('') | length > 0
 
 # =============================================================================
 # Arturia (Windows C) — read-only, on-demand automount
@@ -53,7 +55,7 @@
       What=/dev/disk/by-uuid/{{ arturia_uuid }}
       Where=/mnt/arturia
       Type=ntfs3
-      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,ro,noatime,errors=remount-ro
+      Options=uid={{ vault_locus_user_uid }},gid={{ vault_locus_user_gid }},dmask=022,fmask=133,windows_names,ro,noatime,errors=remount-ro
 
       [Install]
       WantedBy=multi-user.target
