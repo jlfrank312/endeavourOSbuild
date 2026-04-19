@@ -18,13 +18,6 @@ monitor_primary_hdr: true
 nvidia_use_open_modules: true
 
 # =============================================================================
-# User UID/GID for NTFS mount ownership
-# Populate after install with: id jordan
-# =============================================================================
-user_uid: "{{ vault_locus_user_uid }}"
-user_gid: "{{ vault_locus_user_gid }}"
-
-# =============================================================================
 # Data Partition Mounts
 # UUIDs are vaulted. Populate vault after install with: lsblk -f
 # fstype/options/description are not sensitive and live here unencrypted.
@@ -39,19 +32,19 @@ data_mounts:
   - name: lily
     uuid: "{{ vault_locus_lily_uuid }}"
     fstype: ntfs3
-    options: "uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
+    options: "uid={{ vault_locus_user_uid }},gid={{ vault_locus_user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
     description: "Mount lily (CT2000 B)"
 
   - name: mordred
     uuid: "{{ vault_locus_mordred_uuid }}"
     fstype: ntfs3
-    options: "uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
+    options: "uid={{ vault_locus_user_uid }},gid={{ vault_locus_user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
     description: "Mount mordred (NVMe CT1000 E)"
 
   - name: nero
     uuid: "{{ vault_locus_nero_uuid }}"
     fstype: ntfs3
-    options: "uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
+    options: "uid={{ vault_locus_user_uid }},gid={{ vault_locus_user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
     description: "Mount nero (HP EX950 A)"
 
 # Arturia is separate: read-only Windows C, on-demand automount with idle timeout.
