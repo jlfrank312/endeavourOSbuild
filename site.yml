@@ -11,10 +11,12 @@
     - role: common
 
 # STAGE 2. Assign roles according to hardware facts gathered in Stage 1
+# gather_facts: false — facts and global_* set_fact variables from Stage 1
+# are retained in memory for the duration of the playbook run.
 - name: Stage 2 - Assignment of roles according to hardware facts
   hosts: all
   become: true
-  gather_facts: true
+  gather_facts: false
 
   roles:
     - role: cachyos_conversion
