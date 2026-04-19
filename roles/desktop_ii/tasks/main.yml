@@ -277,7 +277,7 @@
     sleep 2
     colormgr device-add-profile xrandr-eDP-1 icc-74249ceae37cdad58cc5066c2234be54
     colormgr device-make-profile-default xrandr-eDP-1 icc-74249ceae37cdad58cc5066c2234be54
-  become: true
+  become: false
   changed_when: true
   when: global_is_laptop | default(false)
 
