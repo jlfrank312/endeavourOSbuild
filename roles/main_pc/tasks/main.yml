@@ -8,19 +8,16 @@
     global_alter_uuid_set: >-
       {{ (data_mounts | selectattr('name', 'equalto', 'alter')
          | list | map(attribute='uuid') | first | default('')) | length > 0 }}
-  become: false
 
 - name: Check whether alter is currently mounted
   ansible.builtin.command: mountpoint -q /mnt/alter
   register: main_pc_alter_mountpoint_check
   changed_when: false
   failed_when: false
-  become: false
 
 - name: Set global_alter_mounted fact # noqa: var-naming
   ansible.builtin.set_fact:
     global_alter_mounted: "{{ main_pc_alter_mountpoint_check.rc == 0 }}"
-  become: false
 
 # =============================================================================
 # 1. Mount Point Creation

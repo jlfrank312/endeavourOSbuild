@@ -99,3 +99,4 @@
     dest: "/home/{{ user_name }}/.local/bin/transcribe"
     owner: "{{ user_name }}"
     mode: '0755'
+  become: false
