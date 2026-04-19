@@ -17,6 +17,19 @@ monitor_primary_hdr: true
 
 nvidia_use_open_modules: true
 
+# nvidia_use_dkms: override DKMS auto-detection for the open driver variant.
+#
+# Auto-detection (default, omit this var): use DKMS if no prebuilt module
+# exists for the running kernel; use prebuilt otherwise.
+#
+# Set true  → always install nvidia-open-dkms (safe choice on CachyOS;
+#              compiles against the running kernel at install time).
+# Set false → always install nvidia-open prebuilt (only use if you have
+#              confirmed the prebuilt matches your current kernel).
+#
+# Uncomment to override:
+# nvidia_use_dkms: true
+
 # =============================================================================
 # Data Partition Mounts
 # UUIDs are vaulted. Populate vault after install with: lsblk -f

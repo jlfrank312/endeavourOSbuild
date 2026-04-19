@@ -29,3 +29,7 @@ seedbox_user: "{{ vault_seedbox_user }}"
 seedbox_name: "{{ vault_seedbox_name }}"
 
 fwupd_bios_guid: "{{ lookup('vars', 'vault_' + ansible_facts['hostname'] + '_fwupd_bios_guid', default='') }}"
+
+naiad_host: "{{ vault_naiad_host | default('') }}"
+naiad_user: "{{ vault_naiad_user | default('') }}"
+naiad_name: "{{ vault_naiad_name | default('naiad') }}"

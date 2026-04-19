@@ -14,6 +14,100 @@
     remote_access_has_ssh_key: "{{ remote_access_ssh_pubkey_stat.stat.exists }}"
 
 # =============================================================================
+# 0a. SSH Server
+#
+# Enable sshd on all desktop and laptop hosts so they can accept inbound
+# connections from peers (e.g. tabula → locus).
+# =============================================================================
+- name: Install OpenSSH
+  community.general.pacman:
+    name: openssh
+    state: present
+  when: global_is_desktop | default(false) or global_is_laptop | default(false)
+
+- name: Enable and start sshd
+  ansible.builtin.systemd:
+    name: sshd
+    enabled: true
+    state: started
+  when: global_is_desktop | default(false) or global_is_laptop | default(false)
+
+# =============================================================================
+# 0b. Cross-host Authorized Keys
+#
+# Any host whose public key has been committed to dotfiles/<host>/.ssh/
+# is automatically authorized on all other managed hosts.
+# Workflow for a new host:
+#   1. Run playbook → section 0c generates a keypair and prints the pubkey.
+#   2. Commit the pubkey to dotfiles/<hostname>/.ssh/id_ed25519.pub.
+#   3. Re-run the playbook → this task distributes it to all peers.
+# =============================================================================
+- name: Ensure .ssh directory exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.ssh"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0700'
+  become: false
+
+- name: Authorize peer SSH public keys
+  ansible.posix.authorized_key:
+    user: "{{ user_name }}"
+    state: present
+    key: "{{ lookup('file', item) }}"
+  loop: >-
+    {{ query('fileglob', playbook_dir + '/dotfiles/*/.ssh/id_ed25519.pub')
+       | reject('search', '/' + ansible_facts['hostname'] + '/')
+       | list }}
+  become: false
+
+# =============================================================================
+# 0c. SSH Keypair Generation (desktop hosts only)
+#
+# If no keypair has been committed to dotfiles for this host, generate one
+# on the machine itself.  The private key never leaves the host.  The printed
+# pubkey must be committed to dotfiles/<hostname>/.ssh/id_ed25519.pub and the
+# playbook re-run so peers can authorize it (section 0b above).
+# =============================================================================
+- name: Check if SSH private key already exists on this host
+  ansible.builtin.stat:
+    path: "/home/{{ user_name }}/.ssh/id_ed25519"
+  register: remote_access_privkey_stat
+  become: false
+
+- name: Generate SSH keypair if not present (desktop hosts)
+  ansible.builtin.command:
+    cmd: "ssh-keygen -t ed25519 -N '' -f /home/{{ user_name }}/.ssh/id_ed25519"
+    creates: "/home/{{ user_name }}/.ssh/id_ed25519"
+  become: true
+  become_user: "{{ user_name }}"
+  when:
+    - global_is_desktop | default(false)
+    - not remote_access_privkey_stat.stat.exists
+  register: remote_access_keypair_generation
+
+- name: Read generated public key for operator reference
+  ansible.builtin.slurp:
+    src: "/home/{{ user_name }}/.ssh/id_ed25519.pub"
+  register: remote_access_generated_pubkey_slurp
+  when:
+    - remote_access_keypair_generation is defined
+    - remote_access_keypair_generation is changed
+
+- name: Remind operator to commit generated pubkey to dotfiles
+  ansible.builtin.debug:
+    msg: |
+      *** New SSH keypair generated on {{ ansible_facts['hostname'] }}.
+          Commit the public key to the repo at:
+            dotfiles/{{ ansible_facts['hostname'] }}/.ssh/id_ed25519.pub
+          then re-run the playbook so peer hosts will authorize it.
+
+          {{ remote_access_generated_pubkey_slurp.content | b64decode | trim }}
+  when:
+    - remote_access_keypair_generation is defined
+    - remote_access_keypair_generation is changed
+
+# =============================================================================
 # 1. FreeRDP
 # =============================================================================
 - name: Install FreeRDP
@@ -200,16 +294,30 @@
     mode: '0755'
   when: remote_access_has_ssh_key
 
-- name: Deploy seedbox SSH config
-  ansible.builtin.copy:
-    dest: "/home/{{ user_name }}/.ssh/config"
+# SSH config uses blockinfile so multiple host stanzas can coexist without
+# overwriting each other.  Each stanza is independently idempotent.
+- name: Ensure SSH config file exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.ssh/config"
+    state: touch
     owner: "{{ user_name }}"
     mode: '0600'
-    content: |
+    modification_time: preserve
+    access_time: preserve
+  become: false
+
+- name: Add seedbox entry to SSH config
+  ansible.builtin.blockinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ seedbox_name }}"
+    block: |
       Host {{ seedbox_name }}
           HostName {{ seedbox_host }}
           User {{ seedbox_user }}
           IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
   become: false
   when: remote_access_has_ssh_key
 
@@ -276,3 +384,158 @@
     state: started
     daemon_reload: true
   when: remote_access_has_ssh_key
+
+# =============================================================================
+# 5. Local Peer SSH Config (locus ↔ tabula)
+#
+# Adds SSH host stanzas so machines on the LAN can reach each other by name
+# without password prompts.  Gated on the host having a keypair (deployed
+# from dotfiles or freshly generated in section 0c).
+# =============================================================================
+- name: Check if SSH key exists (deployed or generated)
+  ansible.builtin.stat:
+    path: "/home/{{ user_name }}/.ssh/id_ed25519"
+  register: remote_access_local_key_stat
+  become: false
+
+- name: Add locus entry to SSH config (on tabula)
+  ansible.builtin.blockinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - locus"
+    block: |
+      Host locus
+          HostName locus.local
+          User {{ user_name }}
+          IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
+  become: false
+  when:
+    - global_is_laptop | default(false)
+    - remote_access_local_key_stat.stat.exists
+
+- name: Add tabula entry to SSH config (on locus)
+  ansible.builtin.blockinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - tabula"
+    block: |
+      Host tabula
+          HostName tabula.local
+          User {{ user_name }}
+          IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
+  become: false
+  when:
+    - global_is_desktop | default(false)
+    - remote_access_local_key_stat.stat.exists
+
+# =============================================================================
+# 6. Naiad (network share — locus only)
+#
+# Naiad is automounted on locus via sshfs, using locus's SSH keypair.
+# Gated on naiad_host being populated in the vault.
+#
+# To enable: populate vault_naiad_host, vault_naiad_user, vault_naiad_name
+# in vault.yml and add the corresponding vars to group_vars/all/all.yml.
+# =============================================================================
+- name: Install sshfs for naiad mount
+  community.general.pacman:
+    name: sshfs
+    state: present
+  when:
+    - global_is_desktop | default(false)
+    - naiad_host | default('') | length > 0
+
+- name: Create naiad mount point
+  ansible.builtin.file:
+    path: "/mnt/{{ naiad_name }}"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+  when:
+    - global_is_desktop | default(false)
+    - naiad_host | default('') | length > 0
+
+- name: Add naiad entry to SSH config (locus)
+  ansible.builtin.blockinfile:
+    path: "/home/{{ user_name }}/.ssh/config"
+    owner: "{{ user_name }}"
+    mode: '0600'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ naiad_name }}"
+    block: |
+      Host {{ naiad_name }}
+          HostName {{ naiad_host }}
+          User {{ naiad_user }}
+          IdentityFile ~/.ssh/id_ed25519
+          StrictHostKeyChecking accept-new
+  become: false
+  when:
+    - global_is_desktop | default(false)
+    - naiad_host | default('') | length > 0
+    - remote_access_local_key_stat.stat.exists
+
+- name: Get user UID and GID for naiad mount
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ user_name }}"
+  when:
+    - global_is_desktop | default(false)
+    - naiad_host | default('') | length > 0
+    - not remote_access_has_ssh_key  # avoid double-run if already fetched above
+
+- name: Deploy systemd mount unit for naiad
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-{{ naiad_name }}.mount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount {{ naiad_name }}
+      After=network-online.target
+      Wants=network-online.target
+
+      [Mount]
+      What={{ naiad_user }}@{{ naiad_host }}:
+      Where=/mnt/{{ naiad_name }}
+      Type=fuse.sshfs
+      Options=identityfile=/home/{{ user_name }}/.ssh/id_ed25519,allow_other,default_permissions,uid={{ ansible_facts['getent_passwd'][user_name][1] }},gid={{ ansible_facts['getent_passwd'][user_name][2] }}
+
+      [Install]
+      WantedBy=multi-user.target
+  when:
+    - global_is_desktop | default(false)
+    - naiad_host | default('') | length > 0
+
+- name: Deploy systemd automount unit for naiad
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-{{ naiad_name }}.automount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Automount {{ naiad_name }}
+      After=network-online.target
+
+      [Automount]
+      Where=/mnt/{{ naiad_name }}
+      TimeoutIdleSec=300
+
+      [Install]
+      WantedBy=multi-user.target
+  when:
+    - global_is_desktop | default(false)
+    - naiad_host | default('') | length > 0
+
+- name: Enable and start naiad automount
+  ansible.builtin.systemd:
+    name: "mnt-{{ naiad_name }}.automount"
+    enabled: true
+    state: started
+    daemon_reload: true
+  when:
+    - global_is_desktop | default(false)
+    - naiad_host | default('') | length > 0
+
