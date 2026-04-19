@@ -134,6 +134,7 @@
     owner: "{{ user_name }}"
     mode: '0755'
   become: false
+  when: global_is_laptop | default(false)
 
 - name: Deploy wallpapers
   ansible.builtin.copy:
