@@ -68,7 +68,6 @@
     content: |
       [Unit]
       Description=Mount arturia (Windows C)
-      After=local-fs.target
       AssertPathExists=/dev/disk/by-uuid/{{ arturia_uuid }}
 
       [Mount]
@@ -89,7 +88,6 @@
     content: |
       [Unit]
       Description=Automount arturia (Windows C) on demand
-      After=local-fs.target
       AssertPathExists=/dev/disk/by-uuid/{{ arturia_uuid }}
 
       [Automount]

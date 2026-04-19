@@ -142,7 +142,8 @@
     owner: "{{ user_name }}"
     mode: '0644'
   become: false
-  when: lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts['hostname'] + '/*') | length > 0
+  when: global_is_laptop | default(false)
+  # lookup('fileglob', playbook_dir + '/dotfiles/wallpapers/' + ansible_facts['hostname'] + '/*') | length > 0
 
 # =============================================================================
 # 3-X. Deploy Common & Host-Specific Dotfiles (II path)
