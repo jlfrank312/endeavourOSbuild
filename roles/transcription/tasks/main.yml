@@ -1,0 +1,264 @@
+---
+# =============================================================================
+# transcription role
+#
+# Installs the full local transcription stack on locus:
+#   - ffmpeg          (system package — audio extraction)
+#   - faster-whisper  (pip, isolated venv on alter)
+#   - Whisper models  (all five sizes, pre-downloaded to alter for evaluation)
+#   - transcribe      (wrapper script → ~/.local/bin/transcribe)
+#
+# Gate conditions (enforced in site.yml):
+#   global_has_nvidia_gpu AND global_is_desktop
+#
+# alter dependency:
+#   Venv and model tasks are gated on global_alter_mounted.
+#   The script is always deployed — it will error gracefully if alter is absent.
+# =============================================================================
+ 
+# =============================================================================
+# 1. System Dependencies
+# =============================================================================
+- name: Install ffmpeg
+  community.general.pacman:
+    name: ffmpeg
+    state: present
+ 
+# =============================================================================
+# 2. Venv Setup (alter-gated)
+# =============================================================================
+- name: Ensure whisper directory exists on alter
+  ansible.builtin.file:
+    path: /mnt/alter/Models/whisper
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+  when: global_alter_mounted | default(false)
+ 
+- name: Create faster-whisper virtualenv
+  ansible.builtin.pip:
+    name:
+      - faster-whisper
+    virtualenv: /mnt/alter/Models/whisper/venv
+    virtualenv_command: python -m venv
+    state: present
+  become: true
+  become_user: "{{ user_name }}"
+  when: global_alter_mounted | default(false)
+ 
+# =============================================================================
+# 3. Model Pre-download (alter-gated)
+#
+# All five model sizes are downloaded for evaluation.  At runtime, --model
+# selects which one to load; default is large-v3.
+#
+# HuggingFace hub cache layout under download_root:
+#   models--Systran--faster-whisper-<name>/
+#
+# The `creates:` argument makes each task idempotent — if the directory
+# already exists the download is skipped entirely, no Python is invoked.
+# =============================================================================
+- name: Pre-download Whisper models
+  ansible.builtin.command:
+    argv:
+      - /mnt/alter/Models/whisper/venv/bin/python
+      - -c
+      - |
+        from faster_whisper import WhisperModel
+        WhisperModel("{{ item }}", device="cpu",
+                     download_root="/mnt/alter/Models/whisper")
+    creates: "/mnt/alter/Models/whisper/models--Systran--faster-whisper-{{ item }}"
+  loop:
+    - tiny
+    - base
+    - small
+    - medium
+    - large-v3
+  become: true
+  become_user: "{{ user_name }}"
+  when: global_alter_mounted | default(false)
+ 
+# =============================================================================
+# 4. Transcribe Script Deployment
+#
+# Shebang points directly at the venv interpreter — no activation needed.
+# The script is self-contained and accepts:
+#   transcribe <video> [--model MODEL] [--language LANG]
+# =============================================================================
+- name: Ensure ~/.local/bin exists
+  ansible.builtin.file:
+    path: "/home/{{ user_name }}/.local/bin"
+    state: directory
+    owner: "{{ user_name }}"
+    mode: '0755'
+  become: false
+ 
+- name: Deploy transcribe script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.local/bin/transcribe"
+    owner: "{{ user_name }}"
+    mode: '0755'
+    content: |
+      #!/mnt/alter/Models/whisper/venv/bin/python
+      """
+      transcribe — local video/audio transcription via faster-whisper + ffmpeg
+ 
+      Usage:
+        transcribe <input_file> [--model MODEL] [--language LANG]
+ 
+      Options:
+        --model MODEL     Whisper model size to load.
+                          Choices: tiny, base, small, medium, large-v3
+                          Default: large-v3
+        --language LANG   BCP-47 source language code (e.g. en, ja, fr, de).
+                          Omit to let Whisper auto-detect.
+ 
+      Output:
+        A .txt file alongside the input, named <input_basename>.txt.
+        Each line: [HH:MM:SS.mmm --> HH:MM:SS.mmm]  <text>
+ 
+      Examples:
+        transcribe lecture.mp4
+        transcribe interview.mkv --model medium
+        transcribe film.mp4 --language ja
+      """
+ 
+      import argparse
+      import os
+      import subprocess
+      import sys
+      import tempfile
+      from pathlib import Path
+ 
+      MODELS_DIR = "/mnt/alter/Models/whisper"
+      DEFAULT_MODEL = "large-v3"
+      MODEL_CHOICES = ["tiny", "base", "small", "medium", "large-v3"]
+ 
+ 
+      def die(msg: str) -> None:
+          print(f"Error: {msg}", file=sys.stderr)
+          sys.exit(1)
+ 
+ 
+      def extract_audio(video_path: Path, tmpdir: str) -> str:
+          """Extract a 16 kHz mono WAV from the input file using ffmpeg."""
+          audio_path = os.path.join(tmpdir, "audio.wav")
+          result = subprocess.run(
+              [
+                  "ffmpeg", "-y",
+                  "-i", str(video_path),
+                  "-ar", "16000",
+                  "-ac", "1",
+                  "-c:a", "pcm_s16le",
+                  audio_path,
+                  "-loglevel", "error",
+              ],
+              capture_output=True,
+              text=True,
+          )
+          if result.returncode != 0:
+              die(f"ffmpeg failed:\n{result.stderr.strip()}")
+          return audio_path
+ 
+ 
+      def fmt_ts(seconds: float) -> str:
+          """Format a float second count as HH:MM:SS.mmm."""
+          h = int(seconds // 3600)
+          m = int((seconds % 3600) // 60)
+          s = seconds % 60
+          return f"{h:02d}:{m:02d}:{s:06.3f}"
+ 
+ 
+      def main() -> None:
+          parser = argparse.ArgumentParser(
+              description="Transcribe video/audio dialogue to a timestamped text file.",
+              formatter_class=argparse.RawDescriptionHelpFormatter,
+          )
+          parser.add_argument("input", help="Path to the video or audio file")
+          parser.add_argument(
+              "--model",
+              default=DEFAULT_MODEL,
+              choices=MODEL_CHOICES,
+              metavar="MODEL",
+              help=f"Whisper model size (default: {DEFAULT_MODEL}). "
+                   f"Choices: {', '.join(MODEL_CHOICES)}",
+          )
+          parser.add_argument(
+              "--language",
+              default=None,
+              metavar="LANG",
+              help="Source language code, e.g. 'en', 'ja'. Omit to auto-detect.",
+          )
+          args = parser.parse_args()
+ 
+          input_path = Path(args.input).resolve()
+          if not input_path.exists():
+              die(f"file not found: {input_path}")
+ 
+          if not Path(MODELS_DIR).exists():
+              die(
+                  f"Models directory not found: {MODELS_DIR}\n"
+                  "  Is the alter partition mounted?  Try: mountpoint /mnt/alter"
+              )
+ 
+          output_path = input_path.with_suffix(".txt")
+ 
+          print(f"  Input  : {input_path}")
+          print(f"  Output : {output_path}")
+          print(f"  Model  : {args.model}")
+          print(f"  Lang   : {args.language or 'auto-detect'}")
+          print()
+ 
+          # Deferred import keeps --help fast and gives a clean error if the
+          # venv is broken rather than a confusing ImportError at startup.
+          try:
+              from faster_whisper import WhisperModel
+          except ImportError:
+              die(
+                  "faster-whisper not importable. Venv may need to be rebuilt.\n"
+                  "  Run the Ansible playbook to reprovision the transcription role."
+              )
+ 
+          print("Loading model…", flush=True)
+          model = WhisperModel(
+              args.model,
+              device="cuda",
+              compute_type="float16",
+              download_root=MODELS_DIR,
+          )
+ 
+          with tempfile.TemporaryDirectory() as tmpdir:
+              print("Extracting audio…", flush=True)
+              audio_path = extract_audio(input_path, tmpdir)
+ 
+              print("Transcribing…", flush=True)
+              segments, info = model.transcribe(
+                  audio_path,
+                  language=args.language,
+                  beam_size=5,
+                  word_timestamps=False,
+                  vad_filter=True,
+                  vad_parameters={"min_silence_duration_ms": 500},
+              )
+ 
+              print(
+                  f"  Detected language: {info.language} "
+                  f"({info.language_probability:.1%} confidence)\n",
+                  flush=True,
+              )
+ 
+              with open(output_path, "w", encoding="utf-8") as f:
+                  for segment in segments:
+                      line = (
+                          f"[{fmt_ts(segment.start)} --> {fmt_ts(segment.end)}]"
+                          f"  {segment.text.strip()}"
+                      )
+                      print(line, flush=True)
+                      f.write(line + "\n")
+ 
+          print(f"\nSaved: {output_path}")
+ 
+ 
+      if __name__ == "__main__":
+          main()
+  become: false

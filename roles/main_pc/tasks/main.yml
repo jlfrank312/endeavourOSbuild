@@ -145,6 +145,19 @@
     daemon_reload: true
   when: arturia_uuid | default('') | length > 0
 
+# Re-probe alter mount status now that the unit has been enabled and started.
+# This ensures sections 4+ see the correct state on a fresh provision run
+# where alter was not mounted when the playbook began.
+- name: Re-check alter mount status after systemd activation
+  ansible.builtin.command: mountpoint -q /mnt/alter
+  register: main_pc_alter_mountpoint_recheck
+  changed_when: false
+  failed_when: false
+
+- name: Update global_alter_mounted after mount activation # noqa: var-naming
+  ansible.builtin.set_fact:
+    global_alter_mounted: "{{ main_pc_alter_mountpoint_recheck.rc == 0 }}"
+
 # =============================================================================
 # 4. alter Directory Structure
 # =============================================================================
