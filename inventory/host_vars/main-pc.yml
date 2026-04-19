@@ -62,3 +62,12 @@ data_mounts:
 
 # Arturia is separate: read-only Windows C, on-demand automount with idle timeout.
 arturia_uuid: "{{ vault_locus_arturia_uuid }}"
+
+# NFS shares exported to tabula when locus is booted into Linux.
+# Names must match the data_mounts names above (they map to /mnt/<name>).
+# Referenced by: templates/nfs-exports.j2, roles/remote_access (via hostvars).
+locus_nfs_shares:
+  - alter
+  - lily
+  - mordred
+  - nero

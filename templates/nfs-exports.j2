@@ -1,0 +1,8 @@
+# Managed by Ansible — role: main_pc
+# Exports data partitions to tabula for NFS automounting.
+# Host-based auth: access is granted to tabula.local only.
+# Replace with SSHFS over Tailscale when Pi/VPN is deployed.
+
+{% for share in locus_nfs_shares %}
+/mnt/{{ share }}    tabula.local(rw,sync,no_subtree_check)
+{% endfor %}

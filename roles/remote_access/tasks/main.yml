@@ -251,6 +251,84 @@
   when: global_is_laptop | default(false)
 
 # =============================================================================
+# 3b. Locus NFS Shares (tabula only)
+#
+# locus is the Linux identity of the same machine as mainpc.  When booted into
+# Linux, locus exports its data partitions over NFS so tabula can reach the
+# same data regardless of which OS is running on that machine.
+#
+# NFS uses host-based auth: access is granted because the request comes from
+# tabula.local on the trusted home LAN — no credentials needed.
+# Mount prefix /mnt/locus/ avoids collision with /mnt/mainpc/.
+#
+# Replace with SSHFS over Tailscale when Pi/VPN is deployed.
+# =============================================================================
+- name: Install nfs-utils (NFS client)
+  community.general.pacman:
+    name: nfs-utils
+    state: present
+  when: global_is_laptop | default(false)
+
+- name: Create mount point directories for locus NFS shares
+  ansible.builtin.file:
+    path: "/mnt/locus/{{ item }}"
+    state: directory
+    owner: root
+    mode: '0755'
+  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  when: global_is_laptop | default(false)
+
+- name: Deploy systemd NFS mount units for locus shares
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-locus-{{ item }}.mount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Mount Locus {{ item }} share (NFS)
+      After=network-online.target
+      Wants=network-online.target
+
+      [Mount]
+      What=locus.local:/mnt/{{ item }}
+      Where=/mnt/locus/{{ item }}
+      Type=nfs
+      Options=rw,hard,_netdev,nofail
+
+      [Install]
+      WantedBy=multi-user.target
+  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  when: global_is_laptop | default(false)
+
+- name: Deploy systemd automount units for locus NFS shares
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/mnt-locus-{{ item }}.automount"
+    owner: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Automount Locus {{ item }} share (NFS)
+      After=network-online.target
+
+      [Automount]
+      Where=/mnt/locus/{{ item }}
+      TimeoutIdleSec=300
+
+      [Install]
+      WantedBy=multi-user.target
+  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  when: global_is_laptop | default(false)
+
+- name: Enable and start automount units for locus NFS shares
+  ansible.builtin.systemd:
+    name: "mnt-locus-{{ item }}.automount"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop: "{{ hostvars['main-pc']['locus_nfs_shares'] }}"
+  when: global_is_laptop | default(false)
+
+# =============================================================================
 # 4. Seedbox SSH Key & SSHFS Mount
 # =============================================================================
 - name: Ensure .ssh directory exists
@@ -432,110 +510,4 @@
     - global_is_desktop | default(false)
     - remote_access_local_key_stat.stat.exists
 
-# =============================================================================
-# 6. Naiad (network share — locus only)
-#
-# Naiad is automounted on locus via sshfs, using locus's SSH keypair.
-# Gated on naiad_host being populated in the vault.
-#
-# To enable: populate vault_naiad_host, vault_naiad_user, vault_naiad_name
-# in vault.yml and add the corresponding vars to group_vars/all/all.yml.
-# =============================================================================
-- name: Install sshfs for naiad mount
-  community.general.pacman:
-    name: sshfs
-    state: present
-  when:
-    - global_is_desktop | default(false)
-    - naiad_host | default('') | length > 0
-
-- name: Create naiad mount point
-  ansible.builtin.file:
-    path: "/mnt/{{ naiad_name }}"
-    state: directory
-    owner: "{{ user_name }}"
-    mode: '0755'
-  when:
-    - global_is_desktop | default(false)
-    - naiad_host | default('') | length > 0
-
-- name: Add naiad entry to SSH config (locus)
-  ansible.builtin.blockinfile:
-    path: "/home/{{ user_name }}/.ssh/config"
-    owner: "{{ user_name }}"
-    mode: '0600'
-    marker: "# {mark} ANSIBLE MANAGED BLOCK - {{ naiad_name }}"
-    block: |
-      Host {{ naiad_name }}
-          HostName {{ naiad_host }}
-          User {{ naiad_user }}
-          IdentityFile ~/.ssh/id_ed25519
-          StrictHostKeyChecking accept-new
-  become: false
-  when:
-    - global_is_desktop | default(false)
-    - naiad_host | default('') | length > 0
-    - remote_access_local_key_stat.stat.exists
-
-- name: Get user UID and GID for naiad mount
-  ansible.builtin.getent:
-    database: passwd
-    key: "{{ user_name }}"
-  when:
-    - global_is_desktop | default(false)
-    - naiad_host | default('') | length > 0
-    - not remote_access_has_ssh_key  # avoid double-run if already fetched above
-
-- name: Deploy systemd mount unit for naiad
-  ansible.builtin.copy:
-    dest: "/etc/systemd/system/mnt-{{ naiad_name }}.mount"
-    owner: root
-    mode: '0644'
-    content: |
-      [Unit]
-      Description=Mount {{ naiad_name }}
-      After=network-online.target
-      Wants=network-online.target
-
-      [Mount]
-      What={{ naiad_user }}@{{ naiad_host }}:
-      Where=/mnt/{{ naiad_name }}
-      Type=fuse.sshfs
-      Options=identityfile=/home/{{ user_name }}/.ssh/id_ed25519,allow_other,default_permissions,uid={{ ansible_facts['getent_passwd'][user_name][1] }},gid={{ ansible_facts['getent_passwd'][user_name][2] }}
-
-      [Install]
-      WantedBy=multi-user.target
-  when:
-    - global_is_desktop | default(false)
-    - naiad_host | default('') | length > 0
-
-- name: Deploy systemd automount unit for naiad
-  ansible.builtin.copy:
-    dest: "/etc/systemd/system/mnt-{{ naiad_name }}.automount"
-    owner: root
-    mode: '0644'
-    content: |
-      [Unit]
-      Description=Automount {{ naiad_name }}
-      After=network-online.target
-
-      [Automount]
-      Where=/mnt/{{ naiad_name }}
-      TimeoutIdleSec=300
-
-      [Install]
-      WantedBy=multi-user.target
-  when:
-    - global_is_desktop | default(false)
-    - naiad_host | default('') | length > 0
-
-- name: Enable and start naiad automount
-  ansible.builtin.systemd:
-    name: "mnt-{{ naiad_name }}.automount"
-    enabled: true
-    state: started
-    daemon_reload: true
-  when:
-    - global_is_desktop | default(false)
-    - naiad_host | default('') | length > 0
 
