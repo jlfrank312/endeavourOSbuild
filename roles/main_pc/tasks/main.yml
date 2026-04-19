@@ -225,10 +225,21 @@
 # UIDs must match between locus and tabula (they will: Ansible creates the
 # same user on both machines).
 # =============================================================================
-- name: Install nfs-utils
+- name: Install nfs-utils and rpcbind
   community.general.pacman:
-    name: nfs-utils
+    name:
+      - nfs-utils
+      - rpcbind
     state: present
+
+# rpcbind must be active before nfs-server starts — nfs-mountd depends on
+# rpcbind.socket for NFSv3 support.  Without it, nfs-mountd sits in
+# activating indefinitely and nfs-server never reaches active.
+- name: Enable and start rpcbind
+  ansible.builtin.systemd:
+    name: rpcbind
+    enabled: true
+    state: started
 
 - name: Deploy NFS exports
   ansible.builtin.template:
