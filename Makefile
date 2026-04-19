@@ -1,4 +1,3 @@
----
 bootstrap:
 	ansible-playbook site.yml -i inventory/ --connection=local --ask-become-pass
 
