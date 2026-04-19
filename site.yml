@@ -11,6 +11,8 @@
     - role: common
 
 # STAGE 2. Assign roles according to hardware facts gathered in Stage 1
+# gather_facts: false — facts and global_* set_fact variables from Stage 1
+# are retained in memory for the duration of the playbook run.
 - name: Stage 2 - Assignment of roles according to hardware facts
   hosts: all
   become: true
@@ -30,8 +32,7 @@
         - not (global_is_virtual_guest | default(false))
 
     - role: intel_gpu
-      when:
-        - global_has_intel_gpu | default(false)
+      when: global_has_intel_gpu | default(false)
 
     - role: desktop_ii
       when:
@@ -47,20 +48,16 @@
       when: global_is_desktop | default(false)
 
     - role: laptop
-      when:
-        - global_is_laptop | default(false)
+      when: global_is_laptop | default(false)
 
     - role: pc_apps
-      when:
-        - (global_is_laptop | default(false) or global_is_desktop | default(false))
+      when: (global_is_laptop | default(false) or global_is_desktop | default(false))
 
     - role: gaming
-      when:
-        - (global_is_desktop | default(false) or global_is_laptop | default(false))
+      when: (global_is_desktop | default(false) or global_is_laptop | default(false))
 
     - role: development
-      when:
-        - (global_is_desktop | default(false) or global_is_laptop | default(false))
+      when: (global_is_desktop | default(false) or global_is_laptop | default(false))
 
     - role: remote_access
 
@@ -70,7 +67,6 @@
         - global_is_desktop | default(false)
 
     - role: pi_services
-      when:
-        - global_is_arm | default(false)
+      when: global_is_arm | default(false)
 
     - role: autoupdate

@@ -2,98 +2,42 @@
 # =============================================================================
 # 1. Mount Point Creation
 # =============================================================================
-- name: Create mount point directories
+- name: Create data mount point directories
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: "/mnt/{{ item.name }}"
     state: directory
     owner: root
     mode: '0755'
-  loop:
-    - /mnt/alter
-    - /mnt/lily
-    - /mnt/mordred
-    - /mnt/nero
-    - /mnt/arturia
+  loop: "{{ data_mounts }}"
+  when: item.uuid | default('') | length > 0
+
+- name: Create arturia mount point
+  ansible.builtin.file:
+    path: /mnt/arturia
+    state: directory
+    owner: root
+    mode: '0755'
+  when: arturia_uuid | default('') | length > 0
 
 # =============================================================================
 # 2. Systemd Mount Units
+# Deployment is gated on UUIDs being populated.
+# Populate vault_locus_*_uuid vars after first boot with: lsblk -f
 # =============================================================================
-- name: Deploy alter mount unit
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/mnt-alter.mount
+- name: Deploy data partition mount units
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/templates/systemd-data-mount.conf.j2"
+    dest: "/etc/systemd/system/mnt-{{ item.name }}.mount"
     owner: root
     mode: '0644'
-    content: |
-      [Unit]
-      Description=Mount alter data partition (CT2000 D)
-      After=local-fs.target
+  loop: "{{ data_mounts }}"
+  when: item.uuid | default('') | length > 0
 
-      [Mount]
-      What=/dev/disk/by-uuid/{{ alter_uuid }}
-      Where=/mnt/alter
-      Type=ext4
-      Options=defaults,noatime
-
-      [Install]
-      WantedBy=multi-user.target
-
-- name: Deploy lily mount unit
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/mnt-lily.mount
-    owner: root
-    mode: '0644'
-    content: |
-      [Unit]
-      Description=Mount lily (CT2000 B)
-      After=local-fs.target
-
-      [Mount]
-      What=/dev/disk/by-uuid/{{ lily_uuid }}
-      Where=/mnt/lily
-      Type=ntfs3
-      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime
-
-      [Install]
-      WantedBy=multi-user.target
-
-- name: Deploy mordred mount unit
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/mnt-mordred.mount
-    owner: root
-    mode: '0644'
-    content: |
-      [Unit]
-      Description=Mount mordred (NVMe CT1000 E)
-      After=local-fs.target
-
-      [Mount]
-      What=/dev/disk/by-uuid/{{ mordred_uuid }}
-      Where=/mnt/mordred
-      Type=ntfs3
-      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime
-
-      [Install]
-      WantedBy=multi-user.target
-
-- name: Deploy nero mount unit
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/mnt-nero.mount
-    owner: root
-    mode: '0644'
-    content: |
-      [Unit]
-      Description=Mount nero (HP EX950 A)
-      After=local-fs.target
-
-      [Mount]
-      What=/dev/disk/by-uuid/{{ nero_uuid }}
-      Where=/mnt/nero
-      Type=ntfs3
-      Options=uid={{ user_uid }},gid={{ user_gid }},dmask=022,fmask=133,windows_names,rw,noatime
-
-      [Install]
-      WantedBy=multi-user.target
-
+# =============================================================================
+# Arturia (Windows C) — read-only, on-demand automount
+# Kept separate: AssertPathExists, ro options, and idle timeout differ
+# from the standard data mounts above.
+# =============================================================================
 - name: Deploy arturia mount unit
   ansible.builtin.copy:
     dest: /etc/systemd/system/mnt-arturia.mount
@@ -113,10 +57,8 @@
 
       [Install]
       WantedBy=multi-user.target
+  when: arturia_uuid | default('') | length > 0
 
-# =============================================================================
-# Arturia (Windows C) On-Demand Mount
-# =============================================================================
 - name: Deploy arturia automount unit
   ansible.builtin.copy:
     dest: /etc/systemd/system/mnt-arturia.automount
@@ -136,7 +78,7 @@
       WantedBy=multi-user.target
   when: arturia_uuid | default('') | length > 0
 
-- name: Deploy mount-arturia script
+- name: Deploy mount-arturia helper script
   ansible.builtin.copy:
     dest: "/home/{{ user_name }}/.local/bin/mount-arturia"
     owner: "{{ user_name }}"
@@ -145,8 +87,9 @@
       #!/bin/bash
       sudo systemctl start mnt-arturia.automount
       echo "arturia mounted. Remember to run umount-arturia before booting Windows."
+  become: false
 
-- name: Deploy umount-arturia script
+- name: Deploy umount-arturia helper script
   ansible.builtin.copy:
     dest: "/home/{{ user_name }}/.local/bin/umount-arturia"
     owner: "{{ user_name }}"
@@ -155,22 +98,27 @@
       #!/bin/bash
       sudo systemctl stop mnt-arturia.automount
       echo "arturia unmounted. Safe to boot Windows."
+  become: false
 
 # =============================================================================
 # 3. Enable and Start Mount Units
 # =============================================================================
-- name: Enable and start mount units
+- name: Enable and start data partition mount units
   ansible.builtin.systemd:
-    name: "{{ item }}"
+    name: "mnt-{{ item.name }}.mount"
     enabled: true
     state: started
     daemon_reload: true
-  loop:
-    - mnt-alter.mount
-    - mnt-lily.mount
-    - mnt-mordred.mount
-    - mnt-nero.mount
-  when: alter_uuid | default('') | length > 0
+  loop: "{{ data_mounts }}"
+  when: item.uuid | default('') | length > 0
+
+- name: Enable and start arturia automount unit
+  ansible.builtin.systemd:
+    name: mnt-arturia.automount
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: arturia_uuid | default('') | length > 0
 
 # =============================================================================
 # 4. alter Directory Structure
@@ -194,11 +142,14 @@
     - Backups
     - Clutter
     - System
+  when: >
+    (data_mounts | selectattr('name', 'equalto', 'alter') | first).uuid
+    | default('') | length > 0
 
 # =============================================================================
-# 5. Home Directory Symlinks
+# 5. Home Directory Symlinks → alter
 # =============================================================================
-- name: Remove existing XDG home directories if present
+- name: Remove existing XDG home directories
   ansible.builtin.file:
     path: "/home/{{ user_name }}/{{ item }}"
     state: absent
@@ -212,6 +163,9 @@
     - Projects
     - Games
     - Clutter
+  when: >
+    (data_mounts | selectattr('name', 'equalto', 'alter') | first).uuid
+    | default('') | length > 0
 
 - name: Create home directory symlinks to alter
   ansible.builtin.file:
@@ -229,37 +183,9 @@
     - Projects
     - Games
     - Clutter
-
-# # =============================================================================
-# # 6. Application Data Symlinks
-# # =============================================================================
-# - name: Remove existing application data directories if present
-#   ansible.builtin.file:
-#     path: "{{ item }}"
-#     state: absent
-#   loop:
-#     - "/home/{{ user_name }}/.thunderbird"
-#     - "/home/{{ user_name }}/.config/mozilla"
-
-# - name: Create application data symlinks to alter/System
-#   ansible.builtin.file:
-#     src: "{{ item.src }}"
-#     dest: "{{ item.dest }}"
-#     state: link
-#     owner: "{{ user_name }}"
-#   loop:
-#     - { src: "/mnt/alter/System/thunderbird", dest: "/home/{{ user_name }}/.thunderbird" }
-#     - { src: "/mnt/alter/System/firefox", dest: "/home/{{ user_name }}/.config/mozilla" }
-
-# # =============================================================================
-# # 7. Ollama Models Directory
-# # =============================================================================
-# - name: Ensure Ollama models directory exists on alter
-#   ansible.builtin.file:
-#     path: /mnt/alter/Models
-#     state: directory
-#     owner: "{{ user_name }}"
-#     mode: '0755'
+  when: >
+    (data_mounts | selectattr('name', 'equalto', 'alter') | first).uuid
+    | default('') | length > 0
 
 # =============================================================================
 # OS Prober (Windows dual-boot detection)
@@ -289,6 +215,7 @@
         state: directory
         owner: "{{ user_name }}"
         mode: '0755'
+      become: false
 
     - name: Deploy Hyprland monitor configuration
       ansible.builtin.copy:
@@ -296,17 +223,19 @@
         dest: "/home/{{ user_name }}/.config/hypr/custom/monitors.conf"
         owner: "{{ user_name }}"
         mode: '0644'
+      become: false
 
     - name: Ensure hyprland.conf sources monitors config
       ansible.builtin.lineinfile:
         path: "/home/{{ user_name }}/.config/hypr/hyprland.conf"
         line: "source = ~/.config/hypr/custom/monitors.conf"
         state: present
+      become: false
 
 # =============================================================================
-# Mainpc Utility Script Deployment
+# HDR Toggle Scripts
 # =============================================================================
-- name: Deploy scripts to toggle DP-1 HDR in Hyprland
+- name: Deploy HDR toggle scripts
   when: use_hyprland | default(false)
   block:
     - name: Deploy hdr-on script
@@ -318,6 +247,7 @@
           #!/bin/bash
           hyprctl keyword monitor DP-1,3440x1440@239.98,2560x0,1,hdr:1
           echo "HDR enabled on AW3425DW"
+      become: false
 
     - name: Deploy hdr-off script
       ansible.builtin.copy:
@@ -328,3 +258,4 @@
           #!/bin/bash
           hyprctl keyword monitor DP-1,3440x1440@239.98,2560x0,1
           echo "HDR disabled on AW3425DW"
+      become: false

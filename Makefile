@@ -19,4 +19,3 @@ snapshot-ii:
 update-ii:
 	ansible-playbook site.yml -i "localhost," --connection=local \
 	  --tags update-ii --ask-become-pass
-	  

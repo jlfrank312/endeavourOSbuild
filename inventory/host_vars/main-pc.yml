@@ -9,29 +9,43 @@ hyprland_vrr: 2    # fullscreen only — safe default for OLED
 # Monitor connectors
 # Populate after first boot by running: hyprctl monitors
 # =============================================================================
-# monitor_primary: DP-1       # Alienware OLED ultrawide — confirm connector
-# monitor_secondary: DP-2     # second monitor — confirm connector
-# =============================================================================
-# Data Partition UUIDs
-# Populate after install with: lsblk -f
-# =============================================================================
-alter_uuid: ""
-lily_uuid: ""
-mordred_uuid: ""
-nero_uuid: ""
-arturia_uuid: ""
-
-# =============================================================================
-# User UID/GID for NTFS mount ownership
-# Populate after install with: id jordan
-# =============================================================================
-user_uid: ""
-user_gid: ""
-
-nvidia_use_open_modules: true
-
 monitor_primary: DP-1      # Dell AW3425DW center
 monitor_secondary: DP-3    # LG UltraGear left
 monitor_tertiary: DP-2     # BenQ GW2780 right
 
 monitor_primary_hdr: true
+
+nvidia_use_open_modules: true
+
+# =============================================================================
+# Data Partition Mounts
+# UUIDs are vaulted. Populate vault after install with: lsblk -f
+# fstype/options/description are not sensitive and live here unencrypted.
+# =============================================================================
+data_mounts:
+  - name: alter
+    uuid: "{{ vault_locus_alter_uuid }}"
+    fstype: ext4
+    options: "defaults,noatime"
+    description: "Mount alter data partition (CT2000 D)"
+
+  - name: lily
+    uuid: "{{ vault_locus_lily_uuid }}"
+    fstype: ntfs3
+    options: "uid={{ vault_locus_user_uid }},gid={{ vault_locus_user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
+    description: "Mount lily (CT2000 B)"
+
+  - name: mordred
+    uuid: "{{ vault_locus_mordred_uuid }}"
+    fstype: ntfs3
+    options: "uid={{ vault_locus_user_uid }},gid={{ vault_locus_user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
+    description: "Mount mordred (NVMe CT1000 E)"
+
+  - name: nero
+    uuid: "{{ vault_locus_nero_uuid }}"
+    fstype: ntfs3
+    options: "uid={{ vault_locus_user_uid }},gid={{ vault_locus_user_gid }},dmask=022,fmask=133,windows_names,rw,noatime"
+    description: "Mount nero (HP EX950 A)"
+
+# Arturia is separate: read-only Windows C, on-demand automount with idle timeout.
+arturia_uuid: "{{ vault_locus_arturia_uuid }}"

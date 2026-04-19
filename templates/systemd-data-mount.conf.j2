@@ -1,0 +1,12 @@
+[Unit]
+Description={{ mount.description }}
+After=local-fs.target
+
+[Mount]
+What=/dev/disk/by-uuid/{{ mount.uuid }}
+Where=/mnt/{{ mount.name }}
+Type={{ mount.fstype }}
+Options={{ mount.options }}
+
+[Install]
+WantedBy=multi-user.target
