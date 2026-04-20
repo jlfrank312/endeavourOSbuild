@@ -3,9 +3,12 @@
 transcribe — local video/audio transcription via faster-whisper + ffmpeg
 
 Usage:
-  transcribe <input_file> [--model MODEL] [--language LANG]
+  transcribe <input_file> [--output PATH] [--model MODEL] [--language LANG]
 
 Options:
+  --output PATH     Output file path. Accepts a full path including filename,
+                    or a directory (transcript is written there as
+                    <input_basename>.txt). Defaults to alongside the input.
   --model MODEL     Whisper model size to load.
                     Choices: tiny, base, small, medium, large-v3
                     Default: large-v3
@@ -13,11 +16,12 @@ Options:
                     Omit to let Whisper auto-detect.
 
 Output:
-  A .txt file alongside the input, named <input_basename>.txt.
-  Each line: [HH:MM:SS.mmm --> HH:MM:SS.mmm]  <text>
+  A .txt file. Each line: [HH:MM:SS.mmm --> HH:MM:SS.mmm]  <text>
 
 Examples:
   transcribe lecture.mp4
+  transcribe lecture.mp4 --output ~/Documents/lecture.txt
+  transcribe lecture.mp4 --output ~/Documents/
   transcribe interview.mkv --model medium
   transcribe film.mp4 --language ja
 """
@@ -93,6 +97,13 @@ def main() -> None:
     )
     parser.add_argument("input", help="Path to the video or audio file")
     parser.add_argument(
+        "--output",
+        default=None,
+        metavar="PATH",
+        help="Output path: a .txt filename or a directory. "
+             "Defaults to alongside the input file.",
+    )
+    parser.add_argument(
         "--model",
         default=DEFAULT_MODEL,
         choices=MODEL_CHOICES,
@@ -118,7 +129,17 @@ def main() -> None:
             "  Is the alter partition mounted?  Try: mountpoint /mnt/alter"
         )
 
-    output_path = input_path.with_suffix(".txt")
+    if args.output is None:
+        output_path = input_path.with_suffix(".txt")
+    else:
+        specified = Path(args.output).expanduser().resolve()
+        if specified.is_dir():
+            output_path = specified / input_path.with_suffix(".txt").name
+        else:
+            output_path = specified
+            if output_path.suffix != ".txt":
+                die(f"output path must end in .txt, got: {output_path}")
+            output_path.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"  Input  : {input_path}")
     print(f"  Output : {output_path}")
