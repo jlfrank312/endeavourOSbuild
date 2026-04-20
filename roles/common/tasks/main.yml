@@ -71,7 +71,7 @@
   ansible.builtin.lineinfile:
     path: /etc/nsswitch.conf
     regexp: '^hosts:'
-    line: 'hosts: mymachines mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] files myhostname dns'
+    line: 'hosts: mymachines files mdns_minimal [NOTFOUND=return] resolve [!UNAVAIL=return] myhostname dns'
     state: present
 
 # =============================================================================

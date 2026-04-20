@@ -7,3 +7,9 @@
 - name: Reload NFS exports
   ansible.builtin.command: exportfs -ra
   become: true
+
+- name: Reload NetworkManager connection
+  ansible.builtin.command:
+    cmd: "nmcli connection up {{ locus_nic }}"
+  become: true
+  changed_when: true

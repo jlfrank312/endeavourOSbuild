@@ -350,3 +350,64 @@
           hyprctl keyword monitor DP-1,3440x1440@239.98,2560x0,1
           echo "HDR disabled on AW3425DW"
       become: false
+
+# =============================================================================
+# Network — Static IP
+#
+# locus has a static IP (vault_locus_ip) so NFS clients can mount by address
+# rather than relying on mDNS resolution.  The NIC and gateway are not
+# sensitive and live in host_vars/main-pc.yml.
+# =============================================================================
+- name: Configure static IP for locus NIC
+  community.general.nmcli:
+    conn_name: "{{ locus_nic }}"
+    ifname: "{{ locus_nic }}"
+    type: ethernet
+    ip4: "{{ locus_ip }}/24"
+    gw4: "{{ locus_gateway }}"
+    dns4:
+      - 8.8.8.8
+      - 8.8.4.4
+    autoconnect: true
+    state: present
+  notify: Reload NetworkManager connection
+
+# =============================================================================
+# Firewall — NFS and VNC
+#
+# NFS requires nfs, mountd, and rpc-bind services.
+# Port 5900/tcp is for wayvnc (on-demand, started by locus-vnc script on tabula).
+# =============================================================================
+- name: Open firewalld services for NFS server
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    state: enabled
+    immediate: true
+  loop:
+    - nfs
+    - mountd
+    - rpc-bind
+
+- name: Open firewalld port for VNC (wayvnc)
+  ansible.posix.firewalld:
+    port: 5900/tcp
+    permanent: true
+    state: enabled
+    immediate: true
+
+# =============================================================================
+# Remote Desktop — wayvnc
+#
+# wayvnc captures the running Hyprland/Wayland session so tabula can view and
+# interact with locus's physical desktop.  It is started on-demand by the
+# locus-vnc script on tabula — no persistent service required.
+#
+# xrdp (independent X11 session) is tracked but not yet implemented —
+# requires a decision on which X11 WM to use for the remote session since
+# Hyprland is Wayland-only and cannot run inside xrdp.
+# =============================================================================
+- name: Install wayvnc
+  community.general.pacman:
+    name: wayvnc
+    state: present

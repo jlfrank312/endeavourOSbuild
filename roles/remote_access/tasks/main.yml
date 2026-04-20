@@ -540,3 +540,88 @@
   when:
     - global_is_laptop | default(false)
     - remote_access_local_key_stat.stat.exists
+
+# =============================================================================
+# 6. Locus Name Resolution (/etc/hosts)
+#
+# tabula and locus are on different network segments (WiFi vs ethernet) behind
+# an Xfinity gateway that does not bridge mDNS multicast between them.
+# locus.local therefore never resolves via avahi on tabula.
+#
+# locus has a static IP so an /etc/hosts entry is stable and correct.
+# This is also why nsswitch.conf (common role) puts 'files' before
+# 'mdns_minimal' — so /etc/hosts entries take precedence for .local names.
+# =============================================================================
+- name: Add locus to /etc/hosts on tabula
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '.*\blocus\b'
+    line: "{{ locus_ip }}  locus.local locus"
+    state: present
+  when: global_is_laptop | default(false)
+
+# =============================================================================
+# 7. Remote Desktop Tools (tabula)
+#
+# tigervnc provides vncviewer for connecting to wayvnc on locus.
+# locus-vnc: starts wayvnc on locus's active Wayland session, connects viewer.
+# locus-rdp: placeholder for xrdp once X11 WM decision is made.
+#
+# Known VNC limitations:
+#   - Super key is captured by tabula's local Hyprland compositor before it
+#     reaches the VNC viewer.  Use Alt as the primary modifier in the remote
+#     session, or add a Hyprland bind on tabula to release Super to the
+#     focused window (not currently possible in Hyprland).
+#   - Resolution reflects locus's physical display config.  Use vncviewer's
+#     built-in scaling (right-click title bar → Scale) to fit tabula's screen.
+# =============================================================================
+- name: Install tigervnc (VNC client for locus-vnc)
+  community.general.pacman:
+    name: tigervnc
+    state: present
+  when: global_is_laptop | default(false)
+
+- name: Deploy locus-vnc connection script
+  ansible.builtin.copy:
+    dest: "/home/{{ user_name }}/.local/bin/locus-vnc"
+    owner: "{{ user_name }}"
+    mode: '0700'
+    content: |
+      #!/bin/bash
+      # Connect to locus's live Hyprland session via wayvnc.
+      # Detects the active Wayland socket dynamically so this works regardless
+      # of which wayland-N socket Hyprland happened to claim at startup.
+
+      LOCUS_IP="{{ locus_ip }}"
+      LOCUS_USER="{{ user_name }}"
+      XDG_RT=/run/user/$(ssh "${LOCUS_USER}@${LOCUS_IP}" "id -u")
+
+      WAYLAND_SOCK=$(ssh "${LOCUS_USER}@${LOCUS_IP}" \
+        "ls ${XDG_RT}/ 2>/dev/null | grep '^wayland-[0-9]' | head -1")
+
+      if [ -z "$WAYLAND_SOCK" ]; then
+        echo "Error: no active Wayland session found on locus" >&2
+        echo "Is Hyprland running on locus?" >&2
+        exit 1
+      fi
+
+      echo "Found Wayland session: ${WAYLAND_SOCK}"
+      echo "Starting wayvnc on locus..."
+
+      # --enable-hw-cursor=false renders the cursor into the framebuffer so it
+      # is visible in the VNC stream (hardware cursors are invisible to VNC).
+      # --once terminates wayvnc automatically when this client disconnects.
+      ssh "${LOCUS_USER}@${LOCUS_IP}" \
+        "WAYLAND_DISPLAY=${WAYLAND_SOCK} XDG_RUNTIME_DIR=${XDG_RT} \
+        wayvnc --enable-hw-cursor=false --once 0.0.0.0 5900" &
+      WAYVNC_SSH=$!
+
+      sleep 2
+      vncviewer "${LOCUS_IP}:5900"
+
+      # Clean up — kill the ssh tunnel holding wayvnc open
+      kill $WAYVNC_SSH 2>/dev/null
+  become: false
+  when:
+    - global_is_laptop | default(false)
+    - remote_access_local_key_stat.stat.exists

@@ -66,3 +66,11 @@ arturia_uuid: "{{ vault_locus_arturia_uuid }}"
 # NFS share list moved to group_vars/all/all.yml (locus_nfs_shares).
 # Defined there so both nfs-exports.j2 (on locus) and remote_access (on tabula)
 # share the same definition without a cross-host hostvars lookup.
+
+# =============================================================================
+# Network
+# Static IP is configured on enp5s0 — locus_ip comes from vault.
+# Gateway is not sensitive and lives here unencrypted.
+# =============================================================================
+locus_nic: enp5s0
+locus_gateway: 10.0.0.1
