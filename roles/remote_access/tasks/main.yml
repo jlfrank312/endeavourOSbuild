@@ -313,7 +313,7 @@
       Wants=network-online.target
 
       [Mount]
-      What=locus.local:/mnt/{{ item }}
+      What={{ locus_ip }}:/mnt/{{ item }}
       Where=/mnt/locus/{{ item }}
       Type=nfs
       Options=rw,soft,timeo=30,retrans=2,_netdev,nofail
