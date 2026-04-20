@@ -8,5 +8,5 @@
 # Replace with SSHFS over Tailscale when Pi/VPN is deployed.
 
 {% for share in locus_nfs_shares %}
-/mnt/{{ share }}    {{ locus_nfs_client_host }}(rw,sync,no_subtree_check)
+/mnt/{{ share }}    {{ locus_nfs_client_host }}(rw,sync,no_subtree_check,no_root_squash)
 {% endfor %}
