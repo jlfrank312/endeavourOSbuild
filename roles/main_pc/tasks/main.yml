@@ -375,9 +375,24 @@
 # =============================================================================
 # Firewall — NFS and VNC
 #
+# firewalld is installed and managed here for locus.  The laptop role handles
+# it for tabula independently.  firewalld must be installed and running before
+# the ansible.posix.firewalld tasks below can execute.
+#
 # NFS requires nfs, mountd, and rpc-bind services.
 # Port 5900/tcp is for wayvnc (on-demand, started by locus-vnc script on tabula).
 # =============================================================================
+- name: Install firewalld
+  community.general.pacman:
+    name: firewalld
+    state: present
+
+- name: Enable and start firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    enabled: true
+    state: started
+
 - name: Open firewalld services for NFS server
   ansible.posix.firewalld:
     service: "{{ item }}"
