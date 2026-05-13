@@ -247,6 +247,7 @@
       [Unit]
       Description=Automount Main PC {{ item }} drive (SMB)
       After=network-online.target
+      DefaultDependencies=no
 
       [Automount]
       Where=/mnt/mainpc/{{ item | lower }}
@@ -332,6 +333,7 @@
       [Unit]
       Description=Automount Locus {{ item }} share (NFS)
       After=network-online.target
+      DefaultDependencies=no
 
       [Automount]
       Where=/mnt/locus/{{ item }}
@@ -464,6 +466,7 @@
       [Unit]
       Description=Automount Seedbox
       After=network-online.target
+      DefaultDependencies=no
 
       [Automount]
       Where=/mnt/{{ seedbox_name }}
